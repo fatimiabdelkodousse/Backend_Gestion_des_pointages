@@ -103,7 +103,6 @@ public class UtilisateurService {
 
         accountTokenRepository.save(accountToken);
 
-        // 🔔 نشر Event (لن يُرسل الإيميل إلا بعد commit)
         String link = "http://localhost:8080/activate-account?token=" + token;
 
         eventPublisher.publishEvent(
