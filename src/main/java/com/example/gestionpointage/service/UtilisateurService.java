@@ -1,6 +1,7 @@
 package com.example.gestionpointage.service;
 
 import com.example.gestionpointage.dto.CreateUserWithBadgeDTO;
+
 import com.example.gestionpointage.entity.AccountToken;
 import com.example.gestionpointage.event.AccountActivationEvent;
 import com.example.gestionpointage.model.Badge;
@@ -10,9 +11,6 @@ import com.example.gestionpointage.repository.AccountTokenRepository;
 import com.example.gestionpointage.repository.UtilisateurRepository;
 import com.example.gestionpointage.security.SecureTokenGenerator;
 import com.example.gestionpointage.security.TokenHashUtil;
-
-import lombok.RequiredArgsConstructor;
-
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,7 +18,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 
 @Service
-@RequiredArgsConstructor
 @Transactional
 public class UtilisateurService {
 

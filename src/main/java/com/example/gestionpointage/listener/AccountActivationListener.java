@@ -2,13 +2,11 @@ package com.example.gestionpointage.listener;
 
 import com.example.gestionpointage.event.AccountActivationEvent;
 import com.example.gestionpointage.service.EmailService;
-import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionalEventListener;
 import org.springframework.transaction.event.TransactionPhase;
 
 @Component
-@RequiredArgsConstructor
 public class AccountActivationListener {
 
     private final EmailService emailService;
