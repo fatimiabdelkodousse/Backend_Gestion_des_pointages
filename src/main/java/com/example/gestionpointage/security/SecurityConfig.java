@@ -36,7 +36,8 @@ public class SecurityConfig {
                     "/auth/login",
                     "/auth/forgot-password",
                     "/auth/set-password",
-                    "/error"
+                    "/error",
+                    "/auth/refresh"
                 ).permitAll()
 
                 .requestMatchers("/ws/**").authenticated()
