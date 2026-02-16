@@ -110,7 +110,7 @@ public class ForgotPasswordService {
 
         tokenRepository.save(t);
 
-        String link = "http://localhost:8080/auth/set-password?token=" + token;
+        String link = "http://gestion-pointage.up.railway.app/auth/set-password?token=" + token;
 
         emailService.sendResetLinkEmail(
                 user.getEmail(),

@@ -2,6 +2,7 @@ package com.example.gestionpointage.controller;
 
 import com.example.gestionpointage.dto.LoginRequestDTO;
 
+import com.example.gestionpointage.entity.UserDevice;
 import com.example.gestionpointage.dto.LoginResponseDTO;
 import com.example.gestionpointage.dto.ForgotPasswordRequestDTO;
 import com.example.gestionpointage.dto.MeResponseDTO;
@@ -20,6 +21,11 @@ import com.example.gestionpointage.security.RefreshTokenService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.security.core.Authentication;
+import com.example.gestionpointage.repository.UserDeviceRepository;
+import com.example.gestionpointage.service.EmailService;
+import com.example.gestionpointage.security.DeviceFingerprintUtil;
+import java.util.Optional;
+import java.time.LocalDateTime;
 
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
@@ -36,6 +42,8 @@ public class AuthController {
     private final ForgotPasswordService forgotPasswordService;
     private final JwtService jwtService;
     private final RefreshTokenService refreshTokenService;
+    private final UserDeviceRepository userDeviceRepository;
+    private final EmailService emailService;
 
     public AuthController(
             UtilisateurRepository utilisateurRepository,
@@ -43,7 +51,9 @@ public class AuthController {
             LoginProtectionService loginProtectionService,
             ForgotPasswordService forgotPasswordService,
             JwtService jwtService,
-            RefreshTokenService refreshTokenService
+            RefreshTokenService refreshTokenService,
+            UserDeviceRepository userDeviceRepository,
+            EmailService emailService
     ) {
         this.utilisateurRepository = utilisateurRepository;
         this.authRepo = authRepo;
@@ -51,6 +61,9 @@ public class AuthController {
         this.forgotPasswordService = forgotPasswordService;
         this.jwtService = jwtService;
         this.refreshTokenService = refreshTokenService;
+        this.userDeviceRepository = userDeviceRepository;
+        this.emailService = emailService;
+        
     }
 
     @PostMapping("/login")
@@ -58,34 +71,36 @@ public class AuthController {
             @RequestBody LoginRequestDTO dto,
             HttpServletRequest request
     ) {
+
         String ip = request.getRemoteAddr();
+        String userAgent = request.getHeader("User-Agent");
         String key = "LOGIN:" + ip + ":" + dto.email;
 
-        // 🔐 rate limiting + delay
         loginProtectionService.check(key);
 
         Utilisateur user = utilisateurRepository
                 .findByEmail(dto.email)
                 .orElseThrow(() ->
-                    new ResponseStatusException(
-                        HttpStatus.UNAUTHORIZED,
-                        "Invalid credentials"
-                    )
+                        new ResponseStatusException(
+                                HttpStatus.UNAUTHORIZED,
+                                "Invalid credentials"
+                        )
                 );
+
         if (!user.isActive()) {
             throw new ResponseStatusException(
-                HttpStatus.UNAUTHORIZED,
-                "Account not activated"
+                    HttpStatus.UNAUTHORIZED,
+                    "Account not activated"
             );
         }
 
         AuthCredentials credentials = authRepo
                 .findByUtilisateur(user)
                 .orElseThrow(() ->
-                    new ResponseStatusException(
-                        HttpStatus.UNAUTHORIZED,
-                        "Invalid credentials"
-                    )
+                        new ResponseStatusException(
+                                HttpStatus.UNAUTHORIZED,
+                                "Invalid credentials"
+                        )
                 );
 
         boolean valid = PasswordHashUtil.verify(
@@ -95,16 +110,58 @@ public class AuthController {
 
         if (!valid) {
             throw new ResponseStatusException(
-                HttpStatus.UNAUTHORIZED,
-                "Invalid credentials"
+                    HttpStatus.UNAUTHORIZED,
+                    "Invalid credentials"
             );
         }
 
-        // ✅ success → reset attempts
         loginProtectionService.success(key);
 
-        Badge badge = user.getBadge();
-        
+        // ==========================================
+        // 🔐 Suspicious Login Detection هنا بالضبط
+        // ==========================================
+
+        String deviceHash =
+                DeviceFingerprintUtil.generate(ip, userAgent);
+
+        Optional<UserDevice> deviceOpt =
+                userDeviceRepository.findByUserAndDeviceHash(
+                        user,
+                        deviceHash
+                );
+
+        if (deviceOpt.isEmpty()) {
+
+            // 🚨 جهاز جديد
+            UserDevice newDevice = new UserDevice();
+            newDevice.setUser(user);
+            newDevice.setDeviceHash(deviceHash);
+            newDevice.setIpAddress(ip);
+            newDevice.setUserAgent(userAgent);
+            newDevice.setFirstSeen(LocalDateTime.now());
+            newDevice.setLastSeen(LocalDateTime.now());
+            newDevice.setTrusted(false);
+
+            userDeviceRepository.save(newDevice);
+
+            // 📧 إرسال تنبيه
+            emailService.sendSuspiciousLoginAlert(
+                    user.getEmail(),
+                    ip,
+                    userAgent
+            );
+
+        } else {
+
+            UserDevice device = deviceOpt.get();
+            device.setLastSeen(LocalDateTime.now());
+            userDeviceRepository.save(device);
+        }
+
+        // ==========================================
+        // 🔐 إنشاء التوكنات
+        // ==========================================
+
         String accessToken = jwtService.generateAccessToken(
                 user.getId().toString(),
                 user.getRole().name()
@@ -112,9 +169,11 @@ public class AuthController {
 
         String refreshToken = refreshTokenService.createRefreshToken(
                 user,
-                request.getRemoteAddr(),
-                request.getHeader("User-Agent")
+                ip,
+                userAgent
         );
+
+        Badge badge = user.getBadge();
 
         return new LoginResponseDTO(
                 user.getId(),

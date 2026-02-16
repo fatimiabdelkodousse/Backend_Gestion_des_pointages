@@ -12,40 +12,83 @@ public class EmailService {
     public EmailService(JavaMailSender mailSender) {
         this.mailSender = mailSender;
     }
-    
+
+    // =====================================================
+    // Generic sender (Reusable)
+    // =====================================================
+    private void send(String to, String subject, String body) {
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setTo(to);
+        message.setSubject(subject);
+        message.setText(body);
+
+        mailSender.send(message);
+    }
+
+    // =====================================================
+    // Activation email
+    // =====================================================
     public void sendActivationLinkEmail(
             String to,
             String prenom,
             String nom,
             String link
     ) {
-        SimpleMailMessage message = new SimpleMailMessage();
-        message.setTo(to);
-        message.setSubject("Activation de votre compte");
-        message.setText(
+
+        String body =
                 "Bonjour " + prenom + " " + nom + ",\n\n" +
                 "Veuillez activer votre compte en cliquant sur le lien suivant :\n" +
                 link + "\n\n" +
-                "Ce lien expire dans 24 heures."
-        );
-        mailSender.send(message);
+                "Ce lien expire dans 24 heures.";
+
+        send(to, "Activation de votre compte", body);
     }
-    
+
+    // =====================================================
+    // Reset password email
+    // =====================================================
     public void sendResetLinkEmail(
             String to,
             String prenom,
             String nom,
             String link
     ) {
-        SimpleMailMessage message = new SimpleMailMessage();
-        message.setTo(to);
-        message.setSubject("Réinitialisation du mot de passe");
-        message.setText(
+
+        String body =
                 "Bonjour " + prenom + " " + nom + ",\n\n" +
                 "Cliquez sur le lien suivant pour définir un nouveau mot de passe :\n" +
                 link + "\n\n" +
-                "Ce lien expire dans 5 minutes."
-        );
-        mailSender.send(message);
+                "Ce lien expire dans 5 minutes.";
+
+        send(to, "Réinitialisation du mot de passe", body);
+    }
+
+    // =====================================================
+    // Suspicious login alert
+    // =====================================================
+    public void sendSuspiciousLoginAlert(
+            String email,
+            String ip,
+            String userAgent
+    ) {
+
+        String subject = "⚠ Suspicious login detected";
+
+        String resetLink =
+                "https://gestion-pointage.up.railway.app/reset-password";
+
+        String body = """
+            A new login was detected on your account.
+
+            IP Address: %s
+            Device: %s
+
+            If this was not you,
+            you can reset your password here:
+
+            %s
+            """.formatted(ip, userAgent, resetLink);
+
+        send(email, subject, body);
     }
 }
