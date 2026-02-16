@@ -100,7 +100,7 @@ public class UtilisateurService {
 
         accountTokenRepository.save(accountToken);
 
-        String link = "http://localhost:8080/activate-account?token=" + token;
+        String link = "https://gestion-pointage.up.railway.app/activate-account?token=" + token;
 
         eventPublisher.publishEvent(
                 new AccountActivationEvent(
