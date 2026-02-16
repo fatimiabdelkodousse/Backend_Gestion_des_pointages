@@ -110,8 +110,10 @@ public class AuthController {
                 user.getRole().name()
         );
 
-        String refreshToken = jwtService.generateRefreshToken(
-                user.getId().toString()
+        String refreshToken = refreshTokenService.createRefreshToken(
+                user,
+                request.getRemoteAddr(),
+                request.getHeader("User-Agent")
         );
 
         return new LoginResponseDTO(

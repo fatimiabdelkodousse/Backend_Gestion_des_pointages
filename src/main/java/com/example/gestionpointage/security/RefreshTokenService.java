@@ -117,5 +117,23 @@ public class RefreshTokenService {
     public void logoutAllEmployees() {
         refreshTokenRepository.revokeAllByRole(Role.EMPLOYE);
     }
+    
+    public String createRefreshToken(Utilisateur user, String ip, String userAgent) {
+
+        String rawToken = SecureTokenGenerator.generate();
+        String hash = TokenHashUtil.hash(rawToken);
+
+        RefreshToken token = new RefreshToken();
+        token.setUser(user);
+        token.setTokenHash(hash);
+        token.setExpiresAt(LocalDateTime.now().plusDays(7));
+        token.setIpAddress(ip);
+        token.setUserAgent(userAgent);
+        token.setRevoked(false);
+
+        refreshTokenRepository.save(token);
+
+        return rawToken;
+    }
 
 }
