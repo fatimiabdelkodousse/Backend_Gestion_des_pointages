@@ -115,5 +115,13 @@ public class Utilisateur {
     public void setDeleted(boolean deleted) {
         this.deleted = deleted;
     }
+    
+    public Site getSite() {
+        return site;
+    }
+
+    public void setSite(Site site) {
+        this.site = site;
+    }
 
 }
