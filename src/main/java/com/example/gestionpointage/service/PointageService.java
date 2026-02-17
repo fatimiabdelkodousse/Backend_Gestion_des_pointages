@@ -620,5 +620,26 @@ public class PointageService {
 
         return result;
     }
+    
+    public List<DailyAttendanceDTO> getDailyAttendanceBySite(
+            Long siteId,
+            LocalDate date
+    ) {
+
+        List<Utilisateur> users =
+                utilisateurRepository.findBySiteId(siteId);
+
+        List<DailyAttendanceDTO> result = new ArrayList<>();
+
+        for (Utilisateur user : users) {
+
+            DailyAttendanceDTO attendance =
+                    getDailyAttendance(user.getId(), date);
+
+            result.add(attendance);
+        }
+
+        return result;
+    }
 
 }

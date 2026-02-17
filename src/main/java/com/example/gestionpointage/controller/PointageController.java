@@ -78,5 +78,16 @@ public class PointageController {
                 LocalDate.parse(date)
         );
     }
+    
+    @GetMapping("/attendance-list")
+    public List<DailyAttendanceDTO> getAttendanceBySite(
+            @RequestParam Long siteId,
+            @RequestParam String date
+    ) {
+        return pointageService.getDailyAttendanceBySite(
+                siteId,
+                LocalDate.parse(date)
+        );
+    }
 
 }
