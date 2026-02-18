@@ -37,7 +37,8 @@ public class SecurityConfig {
                     "/auth/forgot-password",
                     "/auth/set-password",
                     "/error",
-                    "/auth/refresh"
+                    "/auth/refresh",
+                    "/pointages/**"
                 ).permitAll()
 
                 .requestMatchers("/ws/**").authenticated()
@@ -49,7 +50,6 @@ public class SecurityConfig {
                 // 👤 Admin only
                 .requestMatchers("/users/**").hasRole("ADMIN")
                 .requestMatchers("/admin/**").hasRole("ADMIN")
-                .requestMatchers("/pointages/**").hasRole("ADMIN")
                 .requestMatchers("/sites/**").hasRole("ADMIN")
 
                 .anyRequest().authenticated()
