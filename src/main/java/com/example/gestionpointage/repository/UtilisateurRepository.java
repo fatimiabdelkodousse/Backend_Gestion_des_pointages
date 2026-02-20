@@ -83,5 +83,14 @@ public interface UtilisateurRepository extends JpaRepository<Utilisateur, Long> 
     	        String badgeUid
     	);
 
+    @Query("""
+    	    SELECT u FROM Utilisateur u
+    	    JOIN u.badge b
+    	    WHERE u.site.id = :siteId
+    	    AND u.role = com.example.gestionpointage.model.Role.EMPLOYE
+    	    AND u.deleted = false
+    	    AND b.active = true
+    	""")
+    	List<Utilisateur> findActiveEmployeesBySite(Long siteId);
 }
 

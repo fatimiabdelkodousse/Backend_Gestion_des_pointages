@@ -34,7 +34,7 @@ import com.example.gestionpointage.dto.DailyAttendanceDTO;
 import com.example.gestionpointage.dto.AttendanceStatsDTO;
 
 import org.springframework.messaging.simp.SimpMessagingTemplate;
-
+import com.example.gestionpointage.model.Role;
 @Service
 @Transactional
 public class PointageService {
@@ -89,7 +89,7 @@ public class PointageService {
         if (firstEntryOpt.isEmpty()) {
             return afterWorkDay
                     ? AttendanceStatus.ABSENT
-                    : null; // قبل 18:00 لا نحسبه غائب
+                    : null; 
         }
 
         LocalTime arrival =
@@ -125,6 +125,24 @@ public class PointageService {
                                 "Utilisateur introuvable"
                         )
                 );
+        if (user.getRole() != Role.EMPLOYE) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "Seuls les employés peuvent pointer"
+            );
+        }
+        if (user.getBadge() == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "Badge requis"
+            );
+        }
+        if (!user.getBadge().isActive()) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "Badge désactivé"
+            );
+        }
 
         Site site = siteRepository.findById(siteId)
                 .orElseThrow(() ->
@@ -228,8 +246,8 @@ public class PointageService {
             LocalDate date
     ) {
 
-        List<Utilisateur> users =
-                utilisateurRepository.findBySiteId(siteId);
+    	List<Utilisateur> users =
+    	        utilisateurRepository.findActiveEmployeesBySite(siteId);
 
         long total = users.size();
         long early = 0;
@@ -273,8 +291,8 @@ public class PointageService {
             LocalDate date
     ) {
 
-        List<Utilisateur> users =
-                utilisateurRepository.findBySiteId(siteId);
+    	List<Utilisateur> users =
+    	        utilisateurRepository.findActiveEmployeesBySite(siteId);
 
         List<DailyAttendanceDTO> result = new ArrayList<>();
 
@@ -322,7 +340,7 @@ public class PointageService {
         LocalDateTime end = date.atTime(23,59,59);
 
         List<Utilisateur> users =
-                utilisateurRepository.findBySiteId(siteId);
+                utilisateurRepository.findActiveEmployeesBySite(siteId);
 
         List<DailyReportRowDTO> rows = new ArrayList<>();
 
@@ -408,7 +426,7 @@ public class PointageService {
         LocalDate endOfWeek = startOfWeek.plusDays(6);
 
         List<Utilisateur> users =
-                utilisateurRepository.findBySiteId(siteId);
+                utilisateurRepository.findActiveEmployeesBySite(siteId);
 
         List<WeeklyReportDTO> result = new ArrayList<>();
 
@@ -477,7 +495,7 @@ public class PointageService {
                 start.withDayOfMonth(start.lengthOfMonth());
 
         List<Utilisateur> users =
-                utilisateurRepository.findBySiteId(siteId);
+                utilisateurRepository.findActiveEmployeesBySite(siteId);
 
         List<MonthlyReportDTO> result =
                 new ArrayList<>();
@@ -542,7 +560,7 @@ public class PointageService {
         LocalDateTime end   = date.atTime(23,59,59);
 
         List<Utilisateur> users =
-                utilisateurRepository.findBySiteId(siteId);
+                utilisateurRepository.findActiveEmployeesBySite(siteId);
 
         List<String> absentNames = new ArrayList<>();
 
