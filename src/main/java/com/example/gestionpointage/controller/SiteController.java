@@ -1,6 +1,5 @@
 package com.example.gestionpointage.controller;
-
-import com.example.gestionpointage.entity.Site;
+import com.example.gestionpointage.dto.SiteDTO;
 import com.example.gestionpointage.repository.SiteRepository;
 import org.springframework.web.bind.annotation.*;
 
@@ -17,7 +16,10 @@ public class SiteController {
     }
 
     @GetMapping
-    public List<Site> getAllSites() {
-        return siteRepository.findAll();
+    public List<SiteDTO> getAllSites() {
+        return siteRepository.findAll()
+                .stream()
+                .map(s -> new SiteDTO(s.getId(), s.getName()))
+                .toList();
     }
 }

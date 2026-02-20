@@ -10,4 +10,5 @@ public class CreateUserWithBadgeDTO {
     public Role role;
     public String badgeUid;
     public Boolean active;
+    public Long siteId;
 }

@@ -2,6 +2,7 @@ package com.example.gestionpointage.controller;
 
 import com.example.gestionpointage.dto.CreateUserWithBadgeDTO;
 
+
 import org.springframework.http.ResponseEntity;
 
 import com.example.gestionpointage.dto.UtilisateurBadgeDTO;
@@ -10,7 +11,8 @@ import com.example.gestionpointage.model.Utilisateur;
 import com.example.gestionpointage.repository.BadgeRepository;
 import com.example.gestionpointage.repository.UtilisateurRepository;
 import com.example.gestionpointage.service.UtilisateurService;
-
+import com.example.gestionpointage.repository.SiteRepository;
+import com.example.gestionpointage.entity.Site;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -36,15 +38,18 @@ public class UtilisateurController {
     private final UtilisateurRepository utilisateurRepository;
     private final BadgeRepository badgeRepository;
     private final UtilisateurService utilisateurService;
+    private final SiteRepository siteRepository;
     
     public UtilisateurController(
             UtilisateurRepository utilisateurRepository,
             BadgeRepository badgeRepository,
-            UtilisateurService utilisateurService
+            UtilisateurService utilisateurService,
+            SiteRepository siteRepository
     ) {
         this.utilisateurRepository = utilisateurRepository;
         this.badgeRepository = badgeRepository;
         this.utilisateurService = utilisateurService;
+        this.siteRepository = siteRepository;
     }
 
 
@@ -83,13 +88,16 @@ public class UtilisateurController {
         Utilisateur u = utilisateurRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
 
-        // 🔹 تحديث المستخدم
         u.setNom(dto.nom);
         u.setPrenom(dto.prenom);
         u.setEmail(dto.email);
         u.setRole(dto.role);
+        
+        Site site = siteRepository.findById(dto.siteId)
+                .orElseThrow(() -> new RuntimeException("Site introuvable"));
 
-        // 🔹 معالجة البطاقة
+        u.setSite(site);
+
         if (dto.badgeUid == null || dto.badgeUid.isBlank()) {
             if (u.getBadge() != null) {
                 badgeRepository.delete(u.getBadge());

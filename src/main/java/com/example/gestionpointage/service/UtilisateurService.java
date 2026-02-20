@@ -6,17 +6,22 @@ import com.example.gestionpointage.model.Utilisateur;
 import com.example.gestionpointage.repository.UtilisateurRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.example.gestionpointage.repository.SiteRepository;
+import com.example.gestionpointage.entity.Site;
 
 @Service
 @Transactional
 public class UtilisateurService {
 
     private final UtilisateurRepository utilisateurRepository;
+    private final SiteRepository siteRepository;
     
     public UtilisateurService(
-            UtilisateurRepository utilisateurRepository
+            UtilisateurRepository utilisateurRepository,
+            SiteRepository siteRepository
     ) {
         this.utilisateurRepository = utilisateurRepository;
+        this.siteRepository = siteRepository;
     }
 
     public Utilisateur createUserWithBadge(CreateUserWithBadgeDTO dto) {
@@ -44,17 +49,20 @@ public class UtilisateurService {
 
         } else {
 
-            // 🆕 مستخدم جديد
             user = new Utilisateur();
             user.setNom(dto.nom);
             user.setPrenom(dto.prenom);
             user.setEmail(dto.email);
             user.setRole(dto.role);
-            user.setActive(false);
+            user.setActive(true);
             user.setDeleted(false);
         }
+        
+        Site site = siteRepository.findById(dto.siteId)
+                .orElseThrow(() -> new RuntimeException("Site introuvable"));
 
-        // 🪪 إدارة البطاقة
+        user.setSite(site);
+
         if (dto.badgeUid != null && !dto.badgeUid.isBlank()) {
 
             Badge badge = user.getBadge();
