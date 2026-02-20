@@ -29,8 +29,8 @@ public class Utilisateur {
     )
     private Badge badge;
     
-    @Column(nullable = false)
-    private boolean active = false;
+    @Column(nullable = true)
+    private boolean active = true;
     
     @Column(nullable = false)
     private boolean deleted = false;
