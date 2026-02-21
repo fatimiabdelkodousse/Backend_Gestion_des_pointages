@@ -7,6 +7,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import com.example.gestionpointage.model.Utilisateur;
 import java.util.Optional;
 import java.time.LocalDateTime;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.transaction.annotation.Transactional;
 
 public interface AccountTokenRepository extends JpaRepository<AccountToken, Long> {
 
@@ -19,11 +21,6 @@ public interface AccountTokenRepository extends JpaRepository<AccountToken, Long
             String tokenHash
     );
     
-    void deleteByUtilisateurAndTypeAndUsedFalse(
-            Utilisateur utilisateur,
-            TokenType type
-    );
-    
     Optional<AccountToken> 
     findTopByUtilisateurAndTypeAndUsedFalseOrderByCreatedAtDesc(
             Utilisateur utilisateur,
@@ -31,4 +28,11 @@ public interface AccountTokenRepository extends JpaRepository<AccountToken, Long
     );
     
     void deleteByExpiresAtBefore(LocalDateTime time);
+    
+    @Modifying
+    @Transactional
+    void deleteByUtilisateurAndTypeAndUsedFalse(
+            Utilisateur utilisateur,
+            TokenType type
+    );
 }

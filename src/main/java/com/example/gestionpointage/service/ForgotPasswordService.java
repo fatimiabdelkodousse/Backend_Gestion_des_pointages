@@ -1,6 +1,7 @@
 package com.example.gestionpointage.service;
 
 import com.example.gestionpointage.entity.AccountToken;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.example.gestionpointage.model.TokenType;
 import com.example.gestionpointage.repository.AccountTokenRepository;
@@ -35,7 +36,8 @@ public class ForgotPasswordService {
         this.protectionService = protectionService;
         this.emailService = emailService;
     }
-
+    
+    @Transactional
     public void process(
             String email,
             String nom,
