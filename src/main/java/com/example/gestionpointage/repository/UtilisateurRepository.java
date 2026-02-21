@@ -49,23 +49,6 @@ public interface UtilisateurRepository extends JpaRepository<Utilisateur, Long> 
             String email,
             Pageable pageable
     );
-
-    @Query("""
-    	    SELECT new com.example.gestionpointage.dto.UtilisateurBadgeDTO(
-    	        u.id,
-    	        u.nom,
-    	        u.prenom,
-    	        u.email,
-    	        u.role,
-    	        b.badgeUid,
-    	        b.active
-    	    )
-    	    FROM Utilisateur u
-    	    LEFT JOIN u.badge b
-    	    WHERE u.role = com.example.gestionpointage.model.Role.EMPLOYE
-    	    AND u.deleted = false
-    	""")
-    	List<UtilisateurBadgeDTO> findEmployeesWithBadges();
     
     @Query("""
     	    SELECT u FROM Utilisateur u
@@ -92,5 +75,23 @@ public interface UtilisateurRepository extends JpaRepository<Utilisateur, Long> 
     	    AND b.active = true
     	""")
     	List<Utilisateur> findActiveEmployeesBySite(Long siteId);
+    
+    @Query("""
+    	    SELECT new com.example.gestionpointage.dto.UtilisateurBadgeDTO(
+    	        u.id,
+    	        u.nom,
+    	        u.prenom,
+    	        u.email,
+    	        u.role,
+    	        b.badgeUid,
+    	        b.active,
+    	        u.site.id
+    	    )
+    	    FROM Utilisateur u
+    	    LEFT JOIN u.badge b
+    	    WHERE u.role = com.example.gestionpointage.model.Role.EMPLOYE
+    	    AND u.deleted = false
+    	""")
+    	List<UtilisateurBadgeDTO> findEmployeesWithBadges();
 }
 

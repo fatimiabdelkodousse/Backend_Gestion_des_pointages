@@ -11,8 +11,9 @@ public class UtilisateurBadgeDTO {
     private Role role;
     private String badgeUid;
     private Boolean active;
+    private Long siteId;       // ← جديد
 
-    // ✅ IMPORTANT : constructor utilisé par JPQL
+    // ✅ Constructor المستخدم من JPQL
     public UtilisateurBadgeDTO(
             Long id,
             String nom,
@@ -20,7 +21,8 @@ public class UtilisateurBadgeDTO {
             String email,
             Role role,
             String badgeUid,
-            Boolean active
+            Boolean active,
+            Long siteId            // ← جديد
     ) {
         this.id = id;
         this.nom = nom;
@@ -29,35 +31,17 @@ public class UtilisateurBadgeDTO {
         this.role = role;
         this.badgeUid = badgeUid;
         this.active = active;
+        this.siteId = siteId;     // ← جديد
     }
 
     // ===== Getters =====
 
-    public Long getId() {
-        return id;
-    }
-
-    public String getNom() {
-        return nom;
-    }
-
-    public String getPrenom() {
-        return prenom;
-    }
-
-    public String getEmail() {
-        return email;
-    }
-
-    public Role getRole() {
-        return role;
-    }
-
-    public String getBadgeUid() {
-        return badgeUid;
-    }
-
-    public Boolean getActive() {
-        return active;
-    }
+    public Long getId() { return id; }
+    public String getNom() { return nom; }
+    public String getPrenom() { return prenom; }
+    public String getEmail() { return email; }
+    public Role getRole() { return role; }
+    public String getBadgeUid() { return badgeUid; }
+    public Boolean getActive() { return active; }
+    public Long getSiteId() { return siteId; }   // ← جديد
 }
