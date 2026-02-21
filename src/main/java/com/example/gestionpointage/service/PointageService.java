@@ -2,7 +2,6 @@ package com.example.gestionpointage.service;
 
 import com.example.gestionpointage.entity.Pointage;
 
-
 import com.example.gestionpointage.entity.Site;
 import com.example.gestionpointage.model.PointageType;
 import com.example.gestionpointage.model.Utilisateur;
@@ -118,54 +117,54 @@ public class PointageService {
  // CREATE POINTAGE - FIXED (منع الموظفين المحذوفين)
  // =====================================================
 
- public Pointage createPointage(
-         Long userId,
-         Long siteId,
-         PointageType type
- ) {
+    public Pointage createPointage(
+            Long userId,
+            Long siteId,
+            PointageType type
+    ) {
 
-     Utilisateur user = utilisateurRepository.findById(userId)
-             .orElseThrow(() ->
-                     new ResponseStatusException(
-                             HttpStatus.NOT_FOUND,
-                             "Utilisateur introuvable"
-                     )
-             );
+        Utilisateur user = utilisateurRepository.findById(userId)
+                .orElseThrow(() ->
+                        new ResponseStatusException(
+                                HttpStatus.NOT_FOUND,
+                                "Utilisateur introuvable (id=" + userId + ")"
+                        )
+                );
 
-     // ═══ 🔥 NEW: منع الموظفين المحذوفين ═══
-     if (user.isDeleted()) {
-         throw new ResponseStatusException(
-                 HttpStatus.FORBIDDEN,
-                 "Utilisateur supprimé"
-         );
-     }
+        if (user.isDeleted()) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "RAISON: Utilisateur supprimé (id=" + userId + ")"
+            );
+        }
 
-     // ═══ 🔥 NEW: منع الموظفين غير النشطين ═══
-     if (!user.isActive()) {
-         throw new ResponseStatusException(
-                 HttpStatus.FORBIDDEN,
-                 "Utilisateur désactivé"
-         );
-     }
+        if (!user.isActive()) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "RAISON: Utilisateur désactivé (id=" + userId + ")"
+            );
+        }
 
-     if (user.getRole() != Role.EMPLOYE) {
-         throw new ResponseStatusException(
-                 HttpStatus.FORBIDDEN,
-                 "Seuls les employés peuvent pointer"
-         );
-     }
-     if (user.getBadge() == null) {
-         throw new ResponseStatusException(
-                 HttpStatus.FORBIDDEN,
-                 "Badge requis"
-         );
-     }
-     if (!user.getBadge().isActive()) {
-         throw new ResponseStatusException(
-                 HttpStatus.FORBIDDEN,
-                 "Badge désactivé"
-         );
-     }
+        if (user.getRole() != Role.EMPLOYE) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "RAISON: Role=" + user.getRole() + " (seuls EMPLOYE peuvent pointer)"
+            );
+        }
+
+        if (user.getBadge() == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "RAISON: Badge null pour user id=" + userId
+            );
+        }
+
+        if (!user.getBadge().isActive()) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "RAISON: Badge désactivé pour user id=" + userId
+            );
+        }
 
      Site site = siteRepository.findById(siteId)
              .orElseThrow(() ->
