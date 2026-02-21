@@ -184,6 +184,7 @@ public class AuthController {
                 badge != null ? badge.getBadgeUid() : null,
                 badge != null ? badge.isActive() : null,
                 user.getImagePath(),
+                user.getSite() != null ? user.getSite().getId() : null,  // ← جديد
                 accessToken,
                 refreshToken
         );

@@ -12,8 +12,8 @@ public class LoginResponseDTO {
     private String badgeUid;
     private Boolean badgeActive;
     private String imagePath;
+    private Long siteId;          // ← جديد
 
-    // 🔐 JWT
     private String accessToken;
     private String refreshToken;
 
@@ -26,6 +26,7 @@ public class LoginResponseDTO {
             String badgeUid,
             Boolean badgeActive,
             String imagePath,
+            Long siteId,              // ← جديد
             String accessToken,
             String refreshToken
     ) {
@@ -37,6 +38,7 @@ public class LoginResponseDTO {
         this.badgeUid = badgeUid;
         this.badgeActive = badgeActive;
         this.imagePath = imagePath;
+        this.siteId = siteId;         // ← جديد
         this.accessToken = accessToken;
         this.refreshToken = refreshToken;
     }
@@ -49,7 +51,7 @@ public class LoginResponseDTO {
     public String getBadgeUid() { return badgeUid; }
     public Boolean getBadgeActive() { return badgeActive; }
     public String getImagePath() { return imagePath; }
-
+    public Long getSiteId() { return siteId; }    // ← جديد
     public String getAccessToken() { return accessToken; }
     public String getRefreshToken() { return refreshToken; }
 }
