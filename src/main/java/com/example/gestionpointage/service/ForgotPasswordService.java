@@ -47,12 +47,17 @@ public class ForgotPasswordService {
         String key = "FORGOT:" + ip + ":" + email;
         protectionService.check(key);
 
+        // ═══ Normaliser badgeUid ═══
+        String normalizedBadgeUid = (badgeUid == null || badgeUid.isBlank())
+                ? null
+                : badgeUid.trim();
+
         Utilisateur user = utilisateurRepository
                 .findActiveUserForPasswordReset(
                         email.trim(),
                         nom.trim(),
                         prenom.trim(),
-                        badgeUid.trim()
+                        normalizedBadgeUid
                 )
                 .orElseThrow(() ->
                         new ResponseStatusException(

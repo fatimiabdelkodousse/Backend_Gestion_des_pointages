@@ -49,22 +49,6 @@ public interface UtilisateurRepository extends JpaRepository<Utilisateur, Long> 
             String email,
             Pageable pageable
     );
-    
-    @Query("""
-    	    SELECT u FROM Utilisateur u
-    	    JOIN u.badge b
-    	    WHERE LOWER(u.email) = LOWER(:email)
-    	    AND LOWER(u.nom) = LOWER(:nom)
-    	    AND LOWER(u.prenom) = LOWER(:prenom)
-    	    AND b.badgeUid = :badgeUid
-    	    AND u.active = true
-    	""")
-    	Optional<Utilisateur> findActiveUserForPasswordReset(
-    	        String email,
-    	        String nom,
-    	        String prenom,
-    	        String badgeUid
-    	);
 
     @Query("""
     	    SELECT u FROM Utilisateur u
@@ -93,5 +77,21 @@ public interface UtilisateurRepository extends JpaRepository<Utilisateur, Long> 
     	    AND u.deleted = false
     	""")
     	List<UtilisateurBadgeDTO> findEmployeesWithBadges();
+    
+    @Query("""
+    	    SELECT u FROM Utilisateur u
+    	    LEFT JOIN u.badge b
+    	    WHERE LOWER(u.email) = LOWER(:email)
+    	    AND LOWER(u.nom) = LOWER(:nom)
+    	    AND LOWER(u.prenom) = LOWER(:prenom)
+    	    AND (:badgeUid IS NULL OR :badgeUid = '' OR b.badgeUid = :badgeUid)
+    	    AND u.active = true
+    	""")
+    	Optional<Utilisateur> findActiveUserForPasswordReset(
+    	        String email,
+    	        String nom,
+    	        String prenom,
+    	        String badgeUid
+    	);
 }
 
