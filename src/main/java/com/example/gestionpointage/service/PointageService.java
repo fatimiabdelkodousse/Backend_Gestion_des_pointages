@@ -74,7 +74,8 @@ public class PointageService {
         LocalTime absenceLimit   = LocalTime.of(18, 0);
 
         LocalDateTime now = LocalDateTime.now();
-        boolean afterWorkDay = now.isAfter(date.atTime(absenceLimit));
+        boolean isToday = date.equals(LocalDate.now());
+        boolean afterWorkDay = !isToday || now.isAfter(date.atTime(absenceLimit));
 
         var firstEntryOpt =
                 pointageRepository
@@ -87,9 +88,10 @@ public class PointageService {
                         );
 
         if (firstEntryOpt.isEmpty()) {
-            return afterWorkDay
-                    ? AttendanceStatus.ABSENT
-                    : null; 
+            if (afterWorkDay) {
+                return AttendanceStatus.ABSENT;
+            }
+            return AttendanceStatus.ABSENT; 
         }
 
         LocalTime arrival =
@@ -246,8 +248,8 @@ public class PointageService {
             LocalDate date
     ) {
 
-    	List<Utilisateur> users =
-    	        utilisateurRepository.findActiveEmployeesBySite(siteId);
+        List<Utilisateur> users =
+                utilisateurRepository.findActiveEmployeesBySite(siteId);
 
         long total = users.size();
         long early = 0;
@@ -260,7 +262,10 @@ public class PointageService {
             AttendanceStatus status =
                     resolveAttendanceStatus(user, siteId, date);
 
-            if (status == null) continue;
+            if (status == null) {
+                absent++; 
+                continue;
+            }
 
             switch (status) {
                 case EARLY -> early++;
@@ -291,8 +296,8 @@ public class PointageService {
             LocalDate date
     ) {
 
-    	List<Utilisateur> users =
-    	        utilisateurRepository.findActiveEmployeesBySite(siteId);
+        List<Utilisateur> users =
+                utilisateurRepository.findActiveEmployeesBySite(siteId);
 
         List<DailyAttendanceDTO> result = new ArrayList<>();
 
@@ -301,7 +306,9 @@ public class PointageService {
             AttendanceStatus status =
                     resolveAttendanceStatus(user, siteId, date);
 
-            if (status == null) continue;
+            if (status == null) {
+                status = AttendanceStatus.ABSENT; // ← بدل continue
+            }
 
             result.add(
                     new DailyAttendanceDTO(
@@ -316,7 +323,6 @@ public class PointageService {
 
         return result;
     }
-
     public List<Pointage> getTodayBySite(Long siteId) {
 
         LocalDate today = LocalDate.now();
