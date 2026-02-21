@@ -159,13 +159,6 @@ public class PointageService {
             );
         }
 
-        if (!user.getBadge().isActive()) {
-            throw new ResponseStatusException(
-                    HttpStatus.FORBIDDEN,
-                    "RAISON: Badge désactivé pour user id=" + userId
-            );
-        }
-
      Site site = siteRepository.findById(siteId)
              .orElseThrow(() ->
                      new ResponseStatusException(
