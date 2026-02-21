@@ -138,13 +138,6 @@ public class PointageService {
             );
         }
 
-        if (!user.isActive()) {
-            throw new ResponseStatusException(
-                    HttpStatus.FORBIDDEN,
-                    "RAISON: Utilisateur désactivé (id=" + userId + ")"
-            );
-        }
-
         if (user.getRole() != Role.EMPLOYE) {
             throw new ResponseStatusException(
                     HttpStatus.FORBIDDEN,
@@ -156,6 +149,13 @@ public class PointageService {
             throw new ResponseStatusException(
                     HttpStatus.FORBIDDEN,
                     "RAISON: Badge null pour user id=" + userId
+            );
+        }
+
+        if (!user.getBadge().isActive()) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "RAISON: Badge désactivé pour user id=" + userId
             );
         }
 
