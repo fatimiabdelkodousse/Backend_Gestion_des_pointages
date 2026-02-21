@@ -118,11 +118,16 @@ public class UtilisateurController {
         return utilisateurRepository.save(u);
     }
     
+
     @PostMapping("/{id}/upload-image")
     public String uploadProfileImage(
             @PathVariable("id") Long id,
             @RequestParam("file") MultipartFile file
     ) throws IOException {
+
+        if (file.getSize() > 2 * 1024 * 1024) {
+            throw new RuntimeException("Image trop volumineuse (max 2MB)");
+        }
 
         Utilisateur user = utilisateurRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
@@ -130,13 +135,11 @@ public class UtilisateurController {
         String uploadDir = "uploads/";
         Files.createDirectories(Paths.get(uploadDir));
 
-        // 🧹 حذف الصورة القديمة إن وجدت
         if (user.getImagePath() != null) {
             Path oldPath = Paths.get("." + user.getImagePath());
             Files.deleteIfExists(oldPath);
         }
 
-        // 🆕 حفظ الصورة الجديدة
         String filename = UUID.randomUUID() + "_" + file.getOriginalFilename();
         Path newPath = Paths.get(uploadDir + filename);
         Files.write(newPath, file.getBytes());
