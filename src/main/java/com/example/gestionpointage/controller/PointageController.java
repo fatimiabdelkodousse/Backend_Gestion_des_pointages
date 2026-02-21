@@ -82,11 +82,13 @@ public class PointageController {
     @GetMapping("/attendance-list")
     public List<DailyAttendanceDTO> getAttendanceBySite(
             @RequestParam Long siteId,
-            @RequestParam String date
+            @RequestParam String date,
+            @RequestParam(required = false) String status
     ) {
         return pointageService.getDailyAttendanceBySite(
                 siteId,
-                LocalDate.parse(date)
+                LocalDate.parse(date),
+                status
         );
     }
 

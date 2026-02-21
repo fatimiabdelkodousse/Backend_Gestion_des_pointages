@@ -114,90 +114,109 @@ public class PointageService {
     // CREATE POINTAGE
     // =====================================================
 
-    public Pointage createPointage(
-            Long userId,
-            Long siteId,
-            PointageType type
-    ) {
+ // =====================================================
+ // CREATE POINTAGE - FIXED (منع الموظفين المحذوفين)
+ // =====================================================
 
-        Utilisateur user = utilisateurRepository.findById(userId)
-                .orElseThrow(() ->
-                        new ResponseStatusException(
-                                HttpStatus.NOT_FOUND,
-                                "Utilisateur introuvable"
-                        )
-                );
-        if (user.getRole() != Role.EMPLOYE) {
-            throw new ResponseStatusException(
-                    HttpStatus.FORBIDDEN,
-                    "Seuls les employés peuvent pointer"
-            );
-        }
-        if (user.getBadge() == null) {
-            throw new ResponseStatusException(
-                    HttpStatus.FORBIDDEN,
-                    "Badge requis"
-            );
-        }
-        if (!user.getBadge().isActive()) {
-            throw new ResponseStatusException(
-                    HttpStatus.FORBIDDEN,
-                    "Badge désactivé"
-            );
-        }
+ public Pointage createPointage(
+         Long userId,
+         Long siteId,
+         PointageType type
+ ) {
 
-        Site site = siteRepository.findById(siteId)
-                .orElseThrow(() ->
-                        new ResponseStatusException(
-                                HttpStatus.NOT_FOUND,
-                                "Site introuvable"
-                        )
-                );
+     Utilisateur user = utilisateurRepository.findById(userId)
+             .orElseThrow(() ->
+                     new ResponseStatusException(
+                             HttpStatus.NOT_FOUND,
+                             "Utilisateur introuvable"
+                     )
+             );
 
-        Optional<Pointage> lastOpt =
-                pointageRepository.findTopByUserOrderByTimestampDesc(user);
+     // ═══ 🔥 NEW: منع الموظفين المحذوفين ═══
+     if (user.isDeleted()) {
+         throw new ResponseStatusException(
+                 HttpStatus.FORBIDDEN,
+                 "Utilisateur supprimé"
+         );
+     }
 
-        if (lastOpt.isEmpty() && type == PointageType.SORTIE) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "Impossible de sortir sans entrée"
-            );
-        }
+     // ═══ 🔥 NEW: منع الموظفين غير النشطين ═══
+     if (!user.isActive()) {
+         throw new ResponseStatusException(
+                 HttpStatus.FORBIDDEN,
+                 "Utilisateur désactivé"
+         );
+     }
 
-        if (lastOpt.isPresent()) {
+     if (user.getRole() != Role.EMPLOYE) {
+         throw new ResponseStatusException(
+                 HttpStatus.FORBIDDEN,
+                 "Seuls les employés peuvent pointer"
+         );
+     }
+     if (user.getBadge() == null) {
+         throw new ResponseStatusException(
+                 HttpStatus.FORBIDDEN,
+                 "Badge requis"
+         );
+     }
+     if (!user.getBadge().isActive()) {
+         throw new ResponseStatusException(
+                 HttpStatus.FORBIDDEN,
+                 "Badge désactivé"
+         );
+     }
 
-            Pointage last = lastOpt.get();
+     Site site = siteRepository.findById(siteId)
+             .orElseThrow(() ->
+                     new ResponseStatusException(
+                             HttpStatus.NOT_FOUND,
+                             "Site introuvable"
+                     )
+             );
 
-            if (last.getType() == type) {
-                throw new ResponseStatusException(
-                        HttpStatus.BAD_REQUEST,
-                        type == PointageType.ENTREE
-                                ? "Entrée déjà enregistrée"
-                                : "Sortie déjà enregistrée"
-                );
-            }
-        }
+     Optional<Pointage> lastOpt =
+             pointageRepository.findTopByUserOrderByTimestampDesc(user);
 
-        Pointage pointage = new Pointage();
-        pointage.setUser(user);
-        pointage.setSite(site);
-        pointage.setType(type);
-        pointage.setTimestamp(LocalDateTime.now());
+     if (lastOpt.isEmpty() && type == PointageType.SORTIE) {
+         throw new ResponseStatusException(
+                 HttpStatus.BAD_REQUEST,
+                 "Impossible de sortir sans entrée"
+         );
+     }
 
-        Pointage saved = pointageRepository.save(pointage);
+     if (lastOpt.isPresent()) {
+         Pointage last = lastOpt.get();
+         if (last.getType() == type) {
+             throw new ResponseStatusException(
+                     HttpStatus.BAD_REQUEST,
+                     type == PointageType.ENTREE
+                             ? "Entrée déjà enregistrée"
+                             : "Sortie déjà enregistrée"
+             );
+         }
+     }
 
-        messagingTemplate.convertAndSend(
-                "/topic/stats/" + siteId,
-                getDailyStatsBySite(siteId, LocalDate.now())
-        );
+     Pointage pointage = new Pointage();
+     pointage.setUser(user);
+     pointage.setSite(site);
+     pointage.setType(type);
+     pointage.setTimestamp(LocalDateTime.now());
 
-        messagingTemplate.convertAndSend(
-                "/topic/pointages/" + siteId,
-                saved
-        );
+     Pointage saved = pointageRepository.save(pointage);
 
-        return saved;
-    }
+     messagingTemplate.convertAndSend(
+             "/topic/stats/" + siteId,
+             getDailyStatsBySite(siteId, LocalDate.now())
+     );
+
+     messagingTemplate.convertAndSend(
+             "/topic/pointages/" + siteId,
+             saved
+     );
+
+     return saved;
+ }
 
     // =====================================================
     // GET BY USER / SITE
@@ -291,9 +310,11 @@ public class PointageService {
     // ATTENDANCE LIST BY SITE
     // =====================================================
 
+    
     public List<DailyAttendanceDTO> getDailyAttendanceBySite(
             Long siteId,
-            LocalDate date
+            LocalDate date,
+            String statusFilter
     ) {
 
         List<Utilisateur> users =
@@ -307,7 +328,38 @@ public class PointageService {
                     resolveAttendanceStatus(user, siteId, date);
 
             if (status == null) {
-                status = AttendanceStatus.ABSENT; // ← بدل continue
+                status = AttendanceStatus.ABSENT;
+            }
+
+            // ═══ فلتر الحالة ═══
+            if (statusFilter != null && !statusFilter.isEmpty()) {
+                boolean match = false;
+
+                switch (statusFilter.toUpperCase()) {
+                    case "PRESENT":
+                        // ═══ "Présent" = EARLY + ON_TIME + LATE ═══
+                        match = (status == AttendanceStatus.EARLY
+                                || status == AttendanceStatus.ON_TIME
+                                || status == AttendanceStatus.LATE);
+                        break;
+                    case "EARLY":
+                        match = (status == AttendanceStatus.EARLY);
+                        break;
+                    case "ON_TIME":
+                        match = (status == AttendanceStatus.ON_TIME);
+                        break;
+                    case "LATE":
+                        match = (status == AttendanceStatus.LATE);
+                        break;
+                    case "ABSENT":
+                        match = (status == AttendanceStatus.ABSENT);
+                        break;
+                    default:
+                        match = true;
+                        break;
+                }
+
+                if (!match) continue;
             }
 
             result.add(
@@ -323,18 +375,21 @@ public class PointageService {
 
         return result;
     }
+    
     public List<Pointage> getTodayBySite(Long siteId) {
 
         LocalDate today = LocalDate.now();
         LocalDateTime start = today.atStartOfDay();
-        LocalDateTime end = today.atTime(23,59,59);
+        LocalDateTime end = today.atTime(23, 59, 59);
 
-        return pointageRepository
+        List<Pointage> pointages = pointageRepository
             .findBySiteIdAndTimestampBetweenOrderByTimestampDesc(
-                siteId,
-                start,
-                end
+                siteId, start, end
             );
+
+        pointages.removeIf(p -> p.getUser().isDeleted());
+
+        return pointages;
     }
 
     public List<DailyReportRowDTO> generateDailyReport(
