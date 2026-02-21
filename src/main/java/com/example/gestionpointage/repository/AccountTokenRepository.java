@@ -9,6 +9,7 @@ import java.util.Optional;
 import java.time.LocalDateTime;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.transaction.annotation.Transactional;
+import java.util.List;
 
 public interface AccountTokenRepository extends JpaRepository<AccountToken, Long> {
 
@@ -32,6 +33,11 @@ public interface AccountTokenRepository extends JpaRepository<AccountToken, Long
     @Modifying
     @Transactional
     void deleteByUtilisateurAndTypeAndUsedFalse(
+            Utilisateur utilisateur,
+            TokenType type
+    );
+    
+    List<AccountToken> findByUtilisateurAndTypeAndUsedFalse(
             Utilisateur utilisateur,
             TokenType type
     );

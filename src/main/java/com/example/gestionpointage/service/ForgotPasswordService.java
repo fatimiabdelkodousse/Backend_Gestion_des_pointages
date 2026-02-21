@@ -1,8 +1,6 @@
 package com.example.gestionpointage.service;
 
 import com.example.gestionpointage.entity.AccountToken;
-import org.springframework.transaction.annotation.Transactional;
-
 import com.example.gestionpointage.model.TokenType;
 import com.example.gestionpointage.repository.AccountTokenRepository;
 import com.example.gestionpointage.repository.UtilisateurRepository;
@@ -12,10 +10,12 @@ import com.example.gestionpointage.security.TokenHashUtil;
 import com.example.gestionpointage.model.Utilisateur;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
-import java.util.Optional;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
 
 @Service
 public class ForgotPasswordService {
@@ -36,7 +36,7 @@ public class ForgotPasswordService {
         this.protectionService = protectionService;
         this.emailService = emailService;
     }
-    
+
     @Transactional
     public void process(
             String email,
@@ -49,7 +49,6 @@ public class ForgotPasswordService {
         String key = "FORGOT:" + ip + ":" + email;
         protectionService.check(key);
 
-        // ═══ Normaliser badgeUid ═══
         String normalizedBadgeUid = (badgeUid == null || badgeUid.isBlank())
                 ? null
                 : badgeUid.trim();
@@ -69,7 +68,7 @@ public class ForgotPasswordService {
                 );
 
         // ==============================
-        // 🔐 RATE LIMIT PER USER (5 min)
+        // 🔐 RATE LIMIT (5 min)
         // ==============================
 
         Optional<AccountToken> existingToken =
@@ -79,12 +78,9 @@ public class ForgotPasswordService {
                 );
 
         if (existingToken.isPresent()) {
-
             AccountToken lastToken = existingToken.get();
-
             if (lastToken.getCreatedAt()
                     .isAfter(LocalDateTime.now().minusMinutes(5))) {
-
                 throw new ResponseStatusException(
                         HttpStatus.TOO_MANY_REQUESTS,
                         "Please wait before requesting another reset link."
@@ -93,16 +89,22 @@ public class ForgotPasswordService {
         }
 
         // ==============================
-        // 🧹 حذف أي reset token قديم
+        // 🧹 Invalider les anciens tokens (UPDATE au lieu de DELETE)
         // ==============================
 
-        tokenRepository.deleteByUtilisateurAndTypeAndUsedFalse(
-                user,
-                TokenType.RESET
-        );
+        List<AccountToken> oldTokens =
+                tokenRepository.findByUtilisateurAndTypeAndUsedFalse(
+                        user,
+                        TokenType.RESET
+                );
+
+        for (AccountToken old : oldTokens) {
+            old.setUsed(true);
+            tokenRepository.save(old);
+        }
 
         // ==============================
-        // 🔑 إنشاء توكن جديد
+        // 🔑 Nouveau token
         // ==============================
 
         String token = SecureTokenGenerator.generate();
@@ -119,6 +121,7 @@ public class ForgotPasswordService {
 
         String link = "https://gestion-pointage.up.railway.app/auth/set-password?token=" + token;
 
+        // ═══ Email envoyé de manière asynchrone ═══
         emailService.sendResetLinkEmail(
                 user.getEmail(),
                 user.getPrenom(),
