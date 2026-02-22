@@ -36,6 +36,7 @@ public class SecurityConfig {
                     "/auth/login",
                     "/auth/forgot-password",
                     "/auth/set-password",
+                    "/reset-password",
                     "/error",
                     "/auth/refresh",
                     "/pointages/**"
