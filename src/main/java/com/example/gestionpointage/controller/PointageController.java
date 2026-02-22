@@ -25,11 +25,11 @@ public class PointageController {
 
     @PostMapping
     public Pointage create(
-            @RequestParam Long userId,
+            @RequestParam String badgeUid,
             @RequestParam Long siteId,
             @RequestParam PointageType type
     ) {
-        return pointageService.createPointage(userId, siteId, type);
+        return pointageService.createPointageByBadge(badgeUid, siteId, type);
     }
 
     @GetMapping("/user/{userId}")
@@ -41,12 +41,12 @@ public class PointageController {
     public List<Pointage> bySite(@PathVariable Long siteId) {
         return pointageService.getBySite(siteId);
     }
-    
+
     @GetMapping("/site/{siteId}/today")
     public List<Pointage> getTodayBySite(@PathVariable Long siteId) {
         return pointageService.getTodayBySite(siteId);
     }
-    
+
     @GetMapping("/user/{userId}/daily")
     public DailyReportDTO getDailyReport(
             @PathVariable Long userId,
@@ -57,6 +57,7 @@ public class PointageController {
                 LocalDate.parse(date)
         );
     }
+
     @GetMapping("/attendance/{userId}")
     public DailyAttendanceDTO getAttendance(
             @PathVariable Long userId,
@@ -67,7 +68,7 @@ public class PointageController {
                 LocalDate.parse(date)
         );
     }
-    
+
     @GetMapping("/stats")
     public AttendanceStatsDTO getStats(
             @RequestParam Long siteId,
@@ -78,7 +79,7 @@ public class PointageController {
                 LocalDate.parse(date)
         );
     }
-    
+
     @GetMapping("/attendance-list")
     public List<DailyAttendanceDTO> getAttendanceBySite(
             @RequestParam Long siteId,
@@ -91,5 +92,4 @@ public class PointageController {
                 status
         );
     }
-
 }

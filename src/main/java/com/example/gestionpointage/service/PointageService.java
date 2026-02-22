@@ -1,7 +1,8 @@
 package com.example.gestionpointage.service;
 
 import com.example.gestionpointage.entity.Pointage;
-
+import com.example.gestionpointage.repository.BadgeRepository;
+import com.example.gestionpointage.model.Badge;
 import com.example.gestionpointage.entity.Site;
 import com.example.gestionpointage.model.PointageType;
 import com.example.gestionpointage.model.Utilisateur;
@@ -38,22 +39,25 @@ import com.example.gestionpointage.model.Role;
 @Transactional
 public class PointageService {
 
-    private final PointageRepository pointageRepository;
-    private final UtilisateurRepository utilisateurRepository;
-    private final SiteRepository siteRepository;
-    private final SimpMessagingTemplate messagingTemplate;
+	private final PointageRepository pointageRepository;
+	private final UtilisateurRepository utilisateurRepository;
+	private final SiteRepository siteRepository;
+	private final BadgeRepository badgeRepository;
+	private final SimpMessagingTemplate messagingTemplate;
 
-    public PointageService(
-            PointageRepository pointageRepository,
-            UtilisateurRepository utilisateurRepository,
-            SiteRepository siteRepository,
-            SimpMessagingTemplate messagingTemplate
-    ) {
-        this.pointageRepository = pointageRepository;
-        this.utilisateurRepository = utilisateurRepository;
-        this.siteRepository = siteRepository;
-        this.messagingTemplate = messagingTemplate;
-    }
+	public PointageService(
+	        PointageRepository pointageRepository,
+	        UtilisateurRepository utilisateurRepository,
+	        SiteRepository siteRepository,
+	        BadgeRepository badgeRepository,
+	        SimpMessagingTemplate messagingTemplate
+	) {
+	    this.pointageRepository = pointageRepository;
+	    this.utilisateurRepository = utilisateurRepository;
+	    this.siteRepository = siteRepository;
+	    this.badgeRepository = badgeRepository;
+	    this.messagingTemplate = messagingTemplate;
+	}
 
     // =====================================================
     // 🔥 CENTRALIZED ATTENDANCE LOGIC (IMPORTANT)
@@ -113,102 +117,101 @@ public class PointageService {
     // CREATE POINTAGE
     // =====================================================
 
- // =====================================================
- // CREATE POINTAGE - FIXED (منع الموظفين المحذوفين)
- // =====================================================
-
-    public Pointage createPointage(
-            Long userId,
+    public Pointage createPointageByBadge(
+            String badgeUid,
             Long siteId,
             PointageType type
     ) {
 
-        Utilisateur user = utilisateurRepository.findById(userId)
+        Badge badge = badgeRepository.findByBadgeUid(badgeUid)
                 .orElseThrow(() ->
                         new ResponseStatusException(
                                 HttpStatus.NOT_FOUND,
-                                "Utilisateur introuvable (id=" + userId + ")"
+                                "Badge introuvable: " + badgeUid
                         )
                 );
+
+        if (!badge.isActive()) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "Badge désactivé"
+            );
+        }
+
+        Utilisateur user = badge.getUtilisateur();
+
+        if (user == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.NOT_FOUND,
+                    "Aucun utilisateur associé à ce badge"
+            );
+        }
 
         if (user.isDeleted()) {
             throw new ResponseStatusException(
                     HttpStatus.FORBIDDEN,
-                    "RAISON: Utilisateur supprimé (id=" + userId + ")"
+                    "Utilisateur supprimé"
             );
         }
 
         if (user.getRole() != Role.EMPLOYE) {
             throw new ResponseStatusException(
                     HttpStatus.FORBIDDEN,
-                    "RAISON: Role=" + user.getRole() + " (seuls EMPLOYE peuvent pointer)"
+                    "Seuls les employés peuvent pointer"
             );
         }
 
-        if (user.getBadge() == null) {
+        Site site = siteRepository.findById(siteId)
+                .orElseThrow(() ->
+                        new ResponseStatusException(
+                                HttpStatus.NOT_FOUND,
+                                "Site introuvable"
+                        )
+                );
+
+        Optional<Pointage> lastOpt =
+                pointageRepository.findTopByUserOrderByTimestampDesc(user);
+
+        if (lastOpt.isEmpty() && type == PointageType.SORTIE) {
             throw new ResponseStatusException(
-                    HttpStatus.FORBIDDEN,
-                    "RAISON: Badge null pour user id=" + userId
+                    HttpStatus.BAD_REQUEST,
+                    "Impossible de sortir sans entrée"
             );
         }
 
-        if (!user.getBadge().isActive()) {
-            throw new ResponseStatusException(
-                    HttpStatus.FORBIDDEN,
-                    "RAISON: Badge désactivé pour user id=" + userId
-            );
+        if (lastOpt.isPresent()) {
+            Pointage last = lastOpt.get();
+            if (last.getType() == type) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        type == PointageType.ENTREE
+                                ? "Entrée déjà enregistrée"
+                                : "Sortie déjà enregistrée"
+                );
+            }
         }
 
-     Site site = siteRepository.findById(siteId)
-             .orElseThrow(() ->
-                     new ResponseStatusException(
-                             HttpStatus.NOT_FOUND,
-                             "Site introuvable"
-                     )
-             );
+        Pointage pointage = new Pointage();
+        pointage.setUser(user);
+        pointage.setSite(site);
+        pointage.setType(type);
+        pointage.setTimestamp(LocalDateTime.now());
 
-     Optional<Pointage> lastOpt =
-             pointageRepository.findTopByUserOrderByTimestampDesc(user);
+        Pointage saved = pointageRepository.save(pointage);
 
-     if (lastOpt.isEmpty() && type == PointageType.SORTIE) {
-         throw new ResponseStatusException(
-                 HttpStatus.BAD_REQUEST,
-                 "Impossible de sortir sans entrée"
-         );
-     }
+        messagingTemplate.convertAndSend(
+                "/topic/stats/" + siteId,
+                getDailyStatsBySite(siteId, LocalDate.now())
+        );
 
-     if (lastOpt.isPresent()) {
-         Pointage last = lastOpt.get();
-         if (last.getType() == type) {
-             throw new ResponseStatusException(
-                     HttpStatus.BAD_REQUEST,
-                     type == PointageType.ENTREE
-                             ? "Entrée déjà enregistrée"
-                             : "Sortie déjà enregistrée"
-             );
-         }
-     }
+        messagingTemplate.convertAndSend(
+                "/topic/pointages/" + siteId,
+                saved
+        );
 
-     Pointage pointage = new Pointage();
-     pointage.setUser(user);
-     pointage.setSite(site);
-     pointage.setType(type);
-     pointage.setTimestamp(LocalDateTime.now());
+        return saved;
+    }
 
-     Pointage saved = pointageRepository.save(pointage);
-
-     messagingTemplate.convertAndSend(
-             "/topic/stats/" + siteId,
-             getDailyStatsBySite(siteId, LocalDate.now())
-     );
-
-     messagingTemplate.convertAndSend(
-             "/topic/pointages/" + siteId,
-             saved
-     );
-
-     return saved;
- }
 
     // =====================================================
     // GET BY USER / SITE
