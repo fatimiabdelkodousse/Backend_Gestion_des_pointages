@@ -1,7 +1,6 @@
 package com.example.gestionpointage.security;
 
 import jakarta.servlet.FilterChain;
-
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -25,14 +24,25 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     }
 
     @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        String path = request.getRequestURI();
+
+        return path.equals("/reset-password")
+                || path.startsWith("/auth/")
+                || path.startsWith("/pointages")
+                || path.startsWith("/error")
+                || path.startsWith("/ws");
+    }
+
+    @Override
     protected void doFilterInternal(
             HttpServletRequest request,
             HttpServletResponse response,
             FilterChain filterChain
     ) throws ServletException, IOException {
-    	
-    	System.out.println("JWT FILTER: " + request.getRequestURI());
-    	
+
+        System.out.println("JWT FILTER: " + request.getRequestURI());
+
         String header = request.getHeader("Authorization");
 
         if (header == null || !header.startsWith("Bearer ")) {
@@ -43,16 +53,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         String token = header.substring(7);
 
         try {
-        	String type = jwtService.extractType(token);
+            String type = jwtService.extractType(token);
 
-            
             if (!"ACCESS".equals(type)) {
                 filterChain.doFilter(request, response);
                 return;
             }
-      
+
             String userId = jwtService.extractUserId(token);
-            String role   = jwtService.extractRole(token);
+            String role = jwtService.extractRole(token);
 
             var auth = new UsernamePasswordAuthenticationToken(
                     userId,
@@ -61,24 +70,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             );
 
             SecurityContextHolder.getContext().setAuthentication(auth);
-            
+
             System.out.println("AUTH SET: " + role);
 
         } catch (Exception e) {
-            
             SecurityContextHolder.clearContext();
         }
 
         filterChain.doFilter(request, response);
-    }
-    @Override
-    protected boolean shouldNotFilter(HttpServletRequest request) {
-        String path = request.getRequestURI();
-
-        return path.equals("/reset-password")
-                || path.startsWith("/auth/")
-                || path.startsWith("/pointages")
-                || path.startsWith("/error")
-                || path.startsWith("/ws");
     }
 }
