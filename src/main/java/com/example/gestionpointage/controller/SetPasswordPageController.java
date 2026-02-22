@@ -23,6 +23,8 @@ public class SetPasswordPageController {
             @RequestParam String token,
             Model model
     ) {
+        System.out.println("✅ RESET-PASSWORD PAGE HIT! token=" + token);
+
         try {
             TokenType type = setPasswordService.validateAndGetType(token);
 
@@ -32,6 +34,7 @@ public class SetPasswordPageController {
             return "set-password";
 
         } catch (ResponseStatusException e) {
+            System.out.println("❌ Token invalid: " + e.getMessage());
             return "token-invalid";
         }
     }

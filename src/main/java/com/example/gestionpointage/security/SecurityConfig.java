@@ -2,7 +2,6 @@ package com.example.gestionpointage.security;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -32,23 +31,15 @@ public class SecurityConfig {
 
             .authorizeHttpRequests(auth -> auth
 
-                // 🔓 صفحة إعادة تعيين كلمة المرور (HTML)
-                .requestMatchers(HttpMethod.GET, "/reset-password").permitAll()
-                .requestMatchers(HttpMethod.GET, "/reset-password/**").permitAll()
-
-                // 🔓 Auth API endpoints
+                // 🔓 كل المسارات العامة أولاً
+                .requestMatchers("/reset-password").permitAll()
+                .requestMatchers("/reset-password/**").permitAll()
                 .requestMatchers("/auth/**").permitAll()
-
-                // 🔓 Pointages (ESP32)
                 .requestMatchers("/pointages/**").permitAll()
-
-                // 🔓 Error page
                 .requestMatchers("/error").permitAll()
-
-                // 🔓 WebSocket
                 .requestMatchers("/ws/**").permitAll()
 
-                // 📁 Uploads
+                // 📁 uploads
                 .requestMatchers("/uploads/**")
                 .hasAnyRole("ADMIN", "USER")
 

@@ -24,28 +24,28 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     }
 
     @Override
-    protected boolean shouldNotFilter(HttpServletRequest request) {
-        String path = request.getRequestURI();
-
-        return path.equals("/reset-password")
-                || path.startsWith("/auth/")
-                || path.startsWith("/pointages")
-                || path.startsWith("/error")
-                || path.startsWith("/ws");
-    }
-
-    @Override
     protected void doFilterInternal(
             HttpServletRequest request,
             HttpServletResponse response,
             FilterChain filterChain
     ) throws ServletException, IOException {
 
-        System.out.println("JWT FILTER: " + request.getRequestURI());
+        String path = request.getRequestURI();
+        String method = request.getMethod();
+
+        System.out.println("🔍 JWT FILTER: " + method + " " + path);
+
+        // ═══ تجاوز المسارات العامة تماماً ═══
+        if (isPublicPath(path)) {
+            System.out.println("⏭️ SKIPPING (public): " + path);
+            filterChain.doFilter(request, response);
+            return;
+        }
 
         String header = request.getHeader("Authorization");
 
         if (header == null || !header.startsWith("Bearer ")) {
+            System.out.println("⚠️ NO TOKEN for: " + path);
             filterChain.doFilter(request, response);
             return;
         }
@@ -70,13 +70,23 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             );
 
             SecurityContextHolder.getContext().setAuthentication(auth);
-
-            System.out.println("AUTH SET: " + role);
+            System.out.println("✅ AUTH SET: " + role);
 
         } catch (Exception e) {
+            System.out.println("❌ JWT ERROR: " + e.getMessage());
             SecurityContextHolder.clearContext();
         }
 
         filterChain.doFilter(request, response);
     }
+
+    private boolean isPublicPath(String path) {
+        return path.equals("/reset-password")
+                || path.startsWith("/auth/")
+                || path.startsWith("/pointages")
+                || path.startsWith("/error")
+                || path.startsWith("/ws");
+    }
+
+    // ═══ حذف shouldNotFilter ═══
 }
