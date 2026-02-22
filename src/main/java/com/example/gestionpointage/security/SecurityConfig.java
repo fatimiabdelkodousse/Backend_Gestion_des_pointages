@@ -1,5 +1,5 @@
 package com.example.gestionpointage.security;
-
+import org.springframework.http.HttpMethod;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -31,33 +31,20 @@ public class SecurityConfig {
 
             .authorizeHttpRequests(auth -> auth
 
-                // 🔓 Public endpoints
-                .requestMatchers(
-                    "/auth/login",
-                    "/auth/forgot-password",
-                    "/auth/set-password",
-                    "/auth/refresh",
-                    "/auth/logout",
-                    "/reset-password",
-                    "/error",
-                    "/pointages/**"
-                ).permitAll()
+                .requestMatchers(HttpMethod.GET, "/reset-password").permitAll()
+                .requestMatchers(HttpMethod.POST, "/auth/set-password").permitAll()
+                .requestMatchers(HttpMethod.POST, "/auth/login").permitAll()
+                .requestMatchers(HttpMethod.POST, "/auth/forgot-password").permitAll()
+                .requestMatchers(HttpMethod.POST, "/auth/refresh").permitAll()
+                .requestMatchers(HttpMethod.POST, "/auth/logout").permitAll()
 
-                // 🔓 Static resources (Thymeleaf pages)
-                .requestMatchers(
-                    "/css/**",
-                    "/js/**",
-                    "/images/**",
-                    "/webjars/**"
-                ).permitAll()
-
+                .requestMatchers("/error").permitAll()
+                .requestMatchers("/pointages/**").permitAll()
                 .requestMatchers("/ws/**").permitAll()
 
-                // 📁 uploads
                 .requestMatchers("/uploads/**")
                 .hasAnyRole("ADMIN", "USER")
 
-                // 👤 Admin only
                 .requestMatchers("/users/**").hasRole("ADMIN")
                 .requestMatchers("/admin/**").hasRole("ADMIN")
                 .requestMatchers("/sites/**").hasRole("ADMIN")
