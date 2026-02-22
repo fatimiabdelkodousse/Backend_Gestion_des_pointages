@@ -45,12 +45,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         try {
         	String type = jwtService.extractType(token);
 
-            // ❌ نسمح فقط لـ ACCESS tokens
+            
             if (!"ACCESS".equals(type)) {
                 filterChain.doFilter(request, response);
                 return;
             }
-            // 🔐 استخراج البيانات (هنا يتم التحقق تلقائيًا)
+      
             String userId = jwtService.extractUserId(token);
             String role   = jwtService.extractRole(token);
 
@@ -65,7 +65,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             System.out.println("AUTH SET: " + role);
 
         } catch (Exception e) {
-            // ❌ أي خطأ = توكن غير صالح
+            
             SecurityContextHolder.clearContext();
         }
 
@@ -73,6 +73,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     }
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        return false;
+        String path = request.getRequestURI();
+
+        return path.equals("/reset-password")
+                || path.startsWith("/auth/login")
+                || path.startsWith("/auth/forgot-password")
+                || path.startsWith("/auth/set-password")
+                || path.startsWith("/auth/refresh")
+                || path.startsWith("/auth/logout")
+                || path.startsWith("/pointages")
+                || path.startsWith("/error");
     }
 }

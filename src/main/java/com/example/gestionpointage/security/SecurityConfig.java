@@ -36,13 +36,22 @@ public class SecurityConfig {
                     "/auth/login",
                     "/auth/forgot-password",
                     "/auth/set-password",
+                    "/auth/refresh",
+                    "/auth/logout",
                     "/reset-password",
                     "/error",
-                    "/auth/refresh",
                     "/pointages/**"
                 ).permitAll()
 
-                .requestMatchers("/ws/**").authenticated()
+                // 🔓 Static resources (Thymeleaf pages)
+                .requestMatchers(
+                    "/css/**",
+                    "/js/**",
+                    "/images/**",
+                    "/webjars/**"
+                ).permitAll()
+
+                .requestMatchers("/ws/**").permitAll()
 
                 // 📁 uploads
                 .requestMatchers("/uploads/**")
