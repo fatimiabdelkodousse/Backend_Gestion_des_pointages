@@ -28,13 +28,19 @@ public class SetPasswordPageController {
         try {
             TokenType type = setPasswordService.validateAndGetType(token);
 
+            System.out.println("✅ Token valid! Type=" + type);
+
             model.addAttribute("token", token);
             model.addAttribute("mode", type.name());
 
             return "set-password";
 
         } catch (ResponseStatusException e) {
-            System.out.println("❌ Token invalid: " + e.getMessage());
+            System.out.println("❌ Token invalid: " + e.getStatusCode() + " " + e.getReason());
+            return "token-invalid";
+        } catch (Exception e) {
+            System.out.println("❌ UNEXPECTED ERROR: " + e.getClass().getName() + " - " + e.getMessage());
+            e.printStackTrace();
             return "token-invalid";
         }
     }
