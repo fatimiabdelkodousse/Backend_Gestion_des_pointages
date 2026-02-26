@@ -123,6 +123,14 @@ public class PointageService {
             LocalDateTime timestamp
     ) {
 
+        if (!timestamp.toLocalDate().equals(LocalDate.now())) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Le pointage doit être pour la date d'aujourd'hui ("
+                            + LocalDate.now() + ")"
+            );
+        }
+
         Badge badge = badgeRepository.findByBadgeUid(badgeUid)
                 .orElseThrow(() ->
                         new ResponseStatusException(
