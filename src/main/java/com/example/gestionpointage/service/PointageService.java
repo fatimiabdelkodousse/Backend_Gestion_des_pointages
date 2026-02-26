@@ -1,7 +1,6 @@
 package com.example.gestionpointage.service;
 
 import com.example.gestionpointage.entity.Pointage;
-
 import com.example.gestionpointage.repository.BadgeRepository;
 import com.example.gestionpointage.model.Badge;
 import com.example.gestionpointage.entity.Site;
@@ -35,80 +34,88 @@ import com.example.gestionpointage.dto.AttendanceStatsDTO;
 
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import com.example.gestionpointage.model.Role;
+
 @Service
 @Transactional
 public class PointageService {
 
-	private final PointageRepository pointageRepository;
-	private final UtilisateurRepository utilisateurRepository;
-	private final BadgeRepository badgeRepository;
-	private final SimpMessagingTemplate messagingTemplate;
+    private final PointageRepository pointageRepository;
+    private final UtilisateurRepository utilisateurRepository;
+    private final BadgeRepository badgeRepository;
+    private final SimpMessagingTemplate messagingTemplate;
 
-	public PointageService(
-	        PointageRepository pointageRepository,
-	        UtilisateurRepository utilisateurRepository,
-	        BadgeRepository badgeRepository,
-	        SimpMessagingTemplate messagingTemplate
-	) {
-	    this.pointageRepository = pointageRepository;
-	    this.utilisateurRepository = utilisateurRepository;
-	    this.badgeRepository = badgeRepository;
-	    this.messagingTemplate = messagingTemplate;
-	}
-
-    // =====================================================
-    // 🔥 CENTRALIZED ATTENDANCE LOGIC (IMPORTANT)
-    // =====================================================
-
-	private AttendanceStatus resolveAttendanceStatus(
-	        Utilisateur user,
-	        Long siteId,
-	        LocalDate date
-	) {
-
-	    LocalDateTime start = date.atStartOfDay();
-	    LocalDateTime end   = date.atTime(23, 59, 59);
-
-	    LocalTime workStart      = LocalTime.of(9, 0);
-	    LocalTime toleranceLimit = LocalTime.of(9, 5);
-	    LocalTime absenceLimit   = LocalTime.of(18, 0);
-
-	    LocalDateTime now = LocalDateTime.now();
-	    boolean isToday = date.equals(LocalDate.now());
-	    boolean afterWorkDay = !isToday || now.isAfter(date.atTime(absenceLimit));
-
-	    // ═══ 🔥 البحث بدون siteId ═══
-	    var firstEntryOpt =
-	            pointageRepository
-	                    .findTopByUserAndTypeAndTimestampBetweenOrderByTimestampAsc(
-	                            user,
-	                            PointageType.ENTREE,
-	                            start,
-	                            end
-	                    );
-
-	    if (firstEntryOpt.isEmpty()) {
-	        return AttendanceStatus.ABSENT;
-	    }
-
-	    LocalTime arrival =
-	            firstEntryOpt.get()
-	                    .getTimestamp()
-	                    .toLocalTime();
-
-	    if (arrival.isBefore(workStart)) {
-	        return AttendanceStatus.EARLY;
-	    }
-
-	    if (!arrival.isAfter(toleranceLimit)) {
-	        return AttendanceStatus.ON_TIME;
-	    }
-
-	    return AttendanceStatus.LATE;
-	}
+    public PointageService(
+            PointageRepository pointageRepository,
+            UtilisateurRepository utilisateurRepository,
+            BadgeRepository badgeRepository,
+            SimpMessagingTemplate messagingTemplate
+    ) {
+        this.pointageRepository = pointageRepository;
+        this.utilisateurRepository = utilisateurRepository;
+        this.badgeRepository = badgeRepository;
+        this.messagingTemplate = messagingTemplate;
+    }
 
     // =====================================================
-    // CREATE POINTAGE
+    // 🔧 HELPER: حدود اليوم (مُوحّد في كل مكان)
+    // =====================================================
+
+    private LocalDateTime startOfDay(LocalDate date) {
+        return date.atStartOfDay();
+    }
+
+    private LocalDateTime endOfDay(LocalDate date) {
+        return date.atTime(LocalTime.MAX);  // ✅ 23:59:59.999999999
+    }
+
+    // =====================================================
+    // 🔥 CENTRALIZED ATTENDANCE LOGIC
+    // =====================================================
+
+    private AttendanceStatus resolveAttendanceStatus(
+            Utilisateur user,
+            Long siteId,
+            LocalDate date
+    ) {
+
+        LocalDateTime start = startOfDay(date);
+        LocalDateTime end   = endOfDay(date);       // ✅ FIX 3
+
+        LocalTime workStart      = LocalTime.of(9, 0);
+        LocalTime toleranceLimit = LocalTime.of(9, 5);
+
+        // ═══ البحث عن أول ENTREE في نفس اليوم ═══
+        var firstEntryOpt =
+                pointageRepository
+                        .findTopByUserAndTypeAndTimestampBetweenOrderByTimestampAsc(
+                                user,
+                                PointageType.ENTREE,
+                                start,
+                                end
+                        );
+
+        if (firstEntryOpt.isEmpty()) {
+            return AttendanceStatus.ABSENT;
+        }
+
+        LocalTime arrival =
+                firstEntryOpt.get()
+                        .getTimestamp()
+                        .toLocalTime();
+
+        if (arrival.isBefore(workStart)) {
+            return AttendanceStatus.EARLY;
+        }
+
+        if (!arrival.isAfter(toleranceLimit)) {
+            return AttendanceStatus.ON_TIME;
+        }
+
+        return AttendanceStatus.LATE;
+    }
+
+    // =====================================================
+    // ✅ CREATE POINTAGE (مُصحّح)
     // =====================================================
 
     public Pointage createPointageByBadge(
@@ -154,7 +161,6 @@ public class PointageService {
             );
         }
 
-        // ═══ الموقع من حساب الموظف ═══
         Site site = user.getSite();
         if (site == null) {
             throw new ResponseStatusException(
@@ -163,22 +169,31 @@ public class PointageService {
             );
         }
 
-        // ═══ 🔥 استنتاج النوع تلقائياً ═══
-        Optional<Pointage> lastOpt =
-                pointageRepository.findTopByUserOrderByTimestampDesc(user);
+        // ══════════════════════════════════════════════════
+        // ✅ FIX 1: استنتاج النوع من آخر pointage في نفس اليوم فقط
+        // ══════════════════════════════════════════════════
+        LocalDate pointageDate = timestamp.toLocalDate();
+        LocalDateTime dayStart = startOfDay(pointageDate);
+        LocalDateTime dayEnd   = endOfDay(pointageDate);
+
+        Optional<Pointage> lastSameDayOpt =
+                pointageRepository
+                        .findTopByUserAndTimestampBetweenOrderByTimestampDesc(
+                                user,
+                                dayStart,
+                                dayEnd
+                        );
 
         PointageType type;
 
-        if (lastOpt.isEmpty()) {
-            // أول pointage → دخول
+        if (lastSameDayOpt.isEmpty()) {
+            // ═══ أول pointage في هذا اليوم → دائماً ENTREE ═══
             type = PointageType.ENTREE;
         } else {
-            Pointage last = lastOpt.get();
-            if (last.getType() == PointageType.ENTREE) {
-                // آخر واحد كان دخول → الآن خروج
+            Pointage lastToday = lastSameDayOpt.get();
+            if (lastToday.getType() == PointageType.ENTREE) {
                 type = PointageType.SORTIE;
             } else {
-                // آخر واحد كان خروج → الآن دخول
                 type = PointageType.ENTREE;
             }
         }
@@ -193,9 +208,12 @@ public class PointageService {
 
         Long siteId = site.getId();
 
+        // ══════════════════════════════════════════════════
+        // ✅ FIX 2: WebSocket يرسل إحصائيات بتاريخ الـ Pointage
+        // ══════════════════════════════════════════════════
         messagingTemplate.convertAndSend(
                 "/topic/stats/" + siteId,
-                getDailyStatsBySite(siteId, LocalDate.now())
+                getDailyStatsBySite(siteId, pointageDate)  // ✅ تاريخ الـ pointage
         );
 
         messagingTemplate.convertAndSend(
@@ -205,7 +223,6 @@ public class PointageService {
 
         return saved;
     }
-
 
     // =====================================================
     // GET BY USER / SITE
@@ -234,10 +251,6 @@ public class PointageService {
         AttendanceStatus status =
                 resolveAttendanceStatus(user, user.getSite().getId(), date);
 
-        if (status == null) {
-            status = AttendanceStatus.ABSENT;
-        }
-
         return new DailyAttendanceDTO(
                 user.getId(),
                 user.getNom(),
@@ -259,10 +272,10 @@ public class PointageService {
         List<Utilisateur> users =
                 utilisateurRepository.findActiveEmployeesBySite(siteId);
 
-        long total = users.size();
-        long early = 0;
+        long total  = users.size();
+        long early  = 0;
         long onTime = 0;
-        long late = 0;
+        long late   = 0;
         long absent = 0;
 
         for (Utilisateur user : users) {
@@ -270,16 +283,11 @@ public class PointageService {
             AttendanceStatus status =
                     resolveAttendanceStatus(user, siteId, date);
 
-            if (status == null) {
-                absent++; 
-                continue;
-            }
-
             switch (status) {
-                case EARLY -> early++;
+                case EARLY   -> early++;
                 case ON_TIME -> onTime++;
-                case LATE -> late++;
-                case ABSENT -> absent++;
+                case LATE    -> late++;
+                case ABSENT  -> absent++;
             }
         }
 
@@ -299,7 +307,6 @@ public class PointageService {
     // ATTENDANCE LIST BY SITE
     // =====================================================
 
-    
     public List<DailyAttendanceDTO> getDailyAttendanceBySite(
             Long siteId,
             LocalDate date,
@@ -316,37 +323,19 @@ public class PointageService {
             AttendanceStatus status =
                     resolveAttendanceStatus(user, siteId, date);
 
-            if (status == null) {
-                status = AttendanceStatus.ABSENT;
-            }
-
             // ═══ فلتر الحالة ═══
             if (statusFilter != null && !statusFilter.isEmpty()) {
-                boolean match = false;
-
-                switch (statusFilter.toUpperCase()) {
-                    case "PRESENT":
-                        // ═══ "Présent" = EARLY + ON_TIME + LATE ═══
-                        match = (status == AttendanceStatus.EARLY
-                                || status == AttendanceStatus.ON_TIME
-                                || status == AttendanceStatus.LATE);
-                        break;
-                    case "EARLY":
-                        match = (status == AttendanceStatus.EARLY);
-                        break;
-                    case "ON_TIME":
-                        match = (status == AttendanceStatus.ON_TIME);
-                        break;
-                    case "LATE":
-                        match = (status == AttendanceStatus.LATE);
-                        break;
-                    case "ABSENT":
-                        match = (status == AttendanceStatus.ABSENT);
-                        break;
-                    default:
-                        match = true;
-                        break;
-                }
+                boolean match = switch (statusFilter.toUpperCase()) {
+                    case "PRESENT" ->
+                            status == AttendanceStatus.EARLY
+                         || status == AttendanceStatus.ON_TIME
+                         || status == AttendanceStatus.LATE;
+                    case "EARLY"   -> status == AttendanceStatus.EARLY;
+                    case "ON_TIME" -> status == AttendanceStatus.ON_TIME;
+                    case "LATE"    -> status == AttendanceStatus.LATE;
+                    case "ABSENT"  -> status == AttendanceStatus.ABSENT;
+                    default        -> true;
+                };
 
                 if (!match) continue;
             }
@@ -364,30 +353,38 @@ public class PointageService {
 
         return result;
     }
-    
+
+    // =====================================================
+    // TODAY BY SITE
+    // =====================================================
+
     public List<Pointage> getTodayBySite(Long siteId) {
 
         LocalDate today = LocalDate.now();
-        LocalDateTime start = today.atStartOfDay();
-        LocalDateTime end = today.atTime(23, 59, 59);
+        LocalDateTime start = startOfDay(today);
+        LocalDateTime end   = endOfDay(today);    // ✅ FIX 3
 
         List<Pointage> pointages = pointageRepository
-            .findBySiteIdAndTimestampBetweenOrderByTimestampDesc(
-                siteId, start, end
-            );
+                .findBySiteIdAndTimestampBetweenOrderByTimestampDesc(
+                        siteId, start, end
+                );
 
         pointages.removeIf(p -> p.getUser().isDeleted());
 
         return pointages;
     }
 
+    // =====================================================
+    // DAILY REPORT
+    // =====================================================
+
     public List<DailyReportRowDTO> generateDailyReport(
             Long siteId,
             LocalDate date
     ) {
 
-        LocalDateTime start = date.atStartOfDay();
-        LocalDateTime end = date.atTime(23,59,59);
+        LocalDateTime start = startOfDay(date);
+        LocalDateTime end   = endOfDay(date);     // ✅ FIX 3
 
         List<Utilisateur> users =
                 utilisateurRepository.findActiveEmployeesBySite(siteId);
@@ -423,31 +420,26 @@ public class PointageService {
                     pointages.get(0).getTimestamp().toLocalTime();
 
             LocalTime sortie =
-                    pointages.get(pointages.size()-1)
+                    pointages.get(pointages.size() - 1)
                             .getTimestamp()
                             .toLocalTime();
 
             long totalMinutes = 0;
 
-            for (int i=0; i<pointages.size()-1; i++) {
-
-                if (pointages.get(i).getType()
-                        == PointageType.ENTREE
-                        &&
-                    pointages.get(i+1).getType()
-                        == PointageType.SORTIE) {
+            for (int i = 0; i < pointages.size() - 1; i++) {
+                if (pointages.get(i).getType() == PointageType.ENTREE
+                        && pointages.get(i + 1).getType() == PointageType.SORTIE) {
 
                     totalMinutes +=
                             Duration.between(
                                     pointages.get(i).getTimestamp(),
-                                    pointages.get(i+1).getTimestamp()
+                                    pointages.get(i + 1).getTimestamp()
                             ).toMinutes();
                 }
             }
 
             String statut = "Présent";
-
-            if (entree.isAfter(LocalTime.of(9,5))) {
+            if (entree.isAfter(LocalTime.of(9, 5))) {
                 statut = "Retard";
             }
 
@@ -466,14 +458,18 @@ public class PointageService {
 
         return rows;
     }
-    
+
+    // =====================================================
+    // WEEKLY REPORT
+    // =====================================================
+
     public List<WeeklyReportDTO> generateWeeklyReport(
             Long siteId,
             LocalDate date
     ) {
 
         LocalDate startOfWeek = date.with(DayOfWeek.MONDAY);
-        LocalDate endOfWeek = startOfWeek.plusDays(6);
+        LocalDate endOfWeek   = startOfWeek.plusDays(6);
 
         List<Utilisateur> users =
                 utilisateurRepository.findActiveEmployeesBySite(siteId);
@@ -482,10 +478,10 @@ public class PointageService {
 
         for (Utilisateur user : users) {
 
-            long presence = 0;
-            long absence = 0;
+            long presence     = 0;
+            long absence      = 0;
             long totalMinutes = 0;
-            long retards = 0;
+            long retards      = 0;
 
             for (LocalDate d = startOfWeek;
                  !d.isAfter(endOfWeek);
@@ -500,17 +496,13 @@ public class PointageService {
                                 .findFirst()
                                 .orElse(null);
 
-                if (daily == null ||
-                        daily.getStatut().equals("Absent")) {
-
+                if (daily == null
+                        || daily.getStatut().equals("Absent")) {
                     absence++;
                 } else {
-
                     presence++;
                     totalMinutes += daily.getTotalMinutes();
-
-                    if (daily.getStatut()
-                            .equals("Retard")) {
+                    if (daily.getStatut().equals("Retard")) {
                         retards++;
                     }
                 }
@@ -531,30 +523,30 @@ public class PointageService {
 
         return result;
     }
-    
+
+    // =====================================================
+    // MONTHLY REPORT
+    // =====================================================
+
     public List<MonthlyReportDTO> generateMonthlyReport(
             Long siteId,
             int year,
             int month
     ) {
 
-        LocalDate start =
-                LocalDate.of(year, month, 1);
-
-        LocalDate end =
-                start.withDayOfMonth(start.lengthOfMonth());
+        LocalDate start = LocalDate.of(year, month, 1);
+        LocalDate end   = start.withDayOfMonth(start.lengthOfMonth());
 
         List<Utilisateur> users =
                 utilisateurRepository.findActiveEmployeesBySite(siteId);
 
-        List<MonthlyReportDTO> result =
-                new ArrayList<>();
+        List<MonthlyReportDTO> result = new ArrayList<>();
 
         for (Utilisateur user : users) {
 
             long totalMinutes = 0;
-            long totalDays = 0;
-            long absence = 0;
+            long totalDays    = 0;
+            long absence      = 0;
 
             for (LocalDate d = start;
                  !d.isAfter(end);
@@ -569,9 +561,8 @@ public class PointageService {
                                 .findFirst()
                                 .orElse(null);
 
-                if (daily == null ||
-                        daily.getStatut().equals("Absent")) {
-
+                if (daily == null
+                        || daily.getStatut().equals("Absent")) {
                     absence++;
                 } else {
                     totalDays++;
@@ -600,23 +591,23 @@ public class PointageService {
 
         return result;
     }
-    
+
+    // =====================================================
+    // ABSENT USERS
+    // =====================================================
+
     public List<String> getAbsentUsersNames(
             Long siteId,
             LocalDate date
     ) {
 
-        LocalDateTime start = date.atStartOfDay();
-        LocalDateTime end   = date.atTime(23,59,59);
+        LocalDateTime start = startOfDay(date);
+        LocalDateTime end   = endOfDay(date);     // ✅ FIX 3
 
         List<Utilisateur> users =
                 utilisateurRepository.findActiveEmployeesBySite(siteId);
 
         List<String> absentNames = new ArrayList<>();
-
-        LocalDateTime now = LocalDateTime.now();
-        boolean afterWorkDay =
-                now.isAfter(date.atTime(18,0));
 
         for (Utilisateur user : users) {
 
@@ -630,7 +621,7 @@ public class PointageService {
                                     end
                             );
 
-            if (firstEntryOpt.isEmpty() && afterWorkDay) {
+            if (firstEntryOpt.isEmpty()) {
                 absentNames.add(
                         user.getNom() + " " + user.getPrenom()
                 );
@@ -639,10 +630,15 @@ public class PointageService {
 
         return absentNames;
     }
+
+    // =====================================================
+    // DAILY REPORT (SINGLE USER)
+    // =====================================================
+
     public DailyReportDTO getDailyReport(Long userId, LocalDate date) {
 
-        LocalDateTime start = date.atStartOfDay();
-        LocalDateTime end = date.atTime(LocalTime.MAX);
+        LocalDateTime start = startOfDay(date);
+        LocalDateTime end   = endOfDay(date);     // ✅ FIX 3
 
         List<Pointage> pointages =
                 pointageRepository
@@ -657,17 +653,15 @@ public class PointageService {
         for (int i = 0; i < pointages.size() - 1; i++) {
 
             Pointage current = pointages.get(i);
-            Pointage next = pointages.get(i + 1);
+            Pointage next    = pointages.get(i + 1);
 
-            if (current.getType() == PointageType.ENTREE &&
-                    next.getType() == PointageType.SORTIE) {
+            if (current.getType() == PointageType.ENTREE
+                    && next.getType() == PointageType.SORTIE) {
 
-                Duration duration = Duration.between(
+                totalMinutes += Duration.between(
                         current.getTimestamp(),
                         next.getTimestamp()
-                );
-
-                totalMinutes += duration.toMinutes();
+                ).toMinutes();
             }
         }
 
