@@ -1,7 +1,6 @@
 package com.example.gestionpointage.controller;
 
 import com.example.gestionpointage.entity.Pointage;
-import com.example.gestionpointage.model.PointageType;
 import com.example.gestionpointage.service.PointageService;
 
 import org.springframework.web.bind.annotation.*;
@@ -10,6 +9,7 @@ import java.time.LocalDate;
 import com.example.gestionpointage.dto.DailyReportDTO;
 import com.example.gestionpointage.dto.DailyAttendanceDTO;
 import com.example.gestionpointage.dto.AttendanceStatsDTO;
+import java.time.LocalDateTime;
 
 import java.util.List;
 
@@ -26,10 +26,10 @@ public class PointageController {
     @PostMapping
     public Pointage create(
             @RequestParam String badgeUid,
-            @RequestParam Long siteId,
-            @RequestParam PointageType type
+            @RequestParam String timestamp
     ) {
-        return pointageService.createPointageByBadge(badgeUid, siteId, type);
+        LocalDateTime dateTime = LocalDateTime.parse(timestamp);
+        return pointageService.createPointageByBadge(badgeUid, dateTime);
     }
 
     @GetMapping("/user/{userId}")

@@ -1,13 +1,13 @@
 package com.example.gestionpointage.service;
 
 import com.example.gestionpointage.entity.Pointage;
+
 import com.example.gestionpointage.repository.BadgeRepository;
 import com.example.gestionpointage.model.Badge;
 import com.example.gestionpointage.entity.Site;
 import com.example.gestionpointage.model.PointageType;
 import com.example.gestionpointage.model.Utilisateur;
 import com.example.gestionpointage.repository.PointageRepository;
-import com.example.gestionpointage.repository.SiteRepository;
 import com.example.gestionpointage.repository.UtilisateurRepository;
 import com.example.gestionpointage.dto.DailyReportRowDTO;
 import com.example.gestionpointage.dto.WeeklyReportDTO;
@@ -41,20 +41,17 @@ public class PointageService {
 
 	private final PointageRepository pointageRepository;
 	private final UtilisateurRepository utilisateurRepository;
-	private final SiteRepository siteRepository;
 	private final BadgeRepository badgeRepository;
 	private final SimpMessagingTemplate messagingTemplate;
 
 	public PointageService(
 	        PointageRepository pointageRepository,
 	        UtilisateurRepository utilisateurRepository,
-	        SiteRepository siteRepository,
 	        BadgeRepository badgeRepository,
 	        SimpMessagingTemplate messagingTemplate
 	) {
 	    this.pointageRepository = pointageRepository;
 	    this.utilisateurRepository = utilisateurRepository;
-	    this.siteRepository = siteRepository;
 	    this.badgeRepository = badgeRepository;
 	    this.messagingTemplate = messagingTemplate;
 	}
@@ -119,8 +116,7 @@ public class PointageService {
 
     public Pointage createPointageByBadge(
             String badgeUid,
-            Long siteId,
-            PointageType type
+            LocalDateTime timestamp
     ) {
 
         Badge badge = badgeRepository.findByBadgeUid(badgeUid)
@@ -161,33 +157,32 @@ public class PointageService {
             );
         }
 
-        Site site = siteRepository.findById(siteId)
-                .orElseThrow(() ->
-                        new ResponseStatusException(
-                                HttpStatus.NOT_FOUND,
-                                "Site introuvable"
-                        )
-                );
-
-        Optional<Pointage> lastOpt =
-                pointageRepository.findTopByUserOrderByTimestampDesc(user);
-
-        if (lastOpt.isEmpty() && type == PointageType.SORTIE) {
+        // ═══ الموقع من حساب الموظف ═══
+        Site site = user.getSite();
+        if (site == null) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
-                    "Impossible de sortir sans entrée"
+                    "Aucun site associé à cet utilisateur"
             );
         }
 
-        if (lastOpt.isPresent()) {
+        // ═══ 🔥 استنتاج النوع تلقائياً ═══
+        Optional<Pointage> lastOpt =
+                pointageRepository.findTopByUserOrderByTimestampDesc(user);
+
+        PointageType type;
+
+        if (lastOpt.isEmpty()) {
+            // أول pointage → دخول
+            type = PointageType.ENTREE;
+        } else {
             Pointage last = lastOpt.get();
-            if (last.getType() == type) {
-                throw new ResponseStatusException(
-                        HttpStatus.BAD_REQUEST,
-                        type == PointageType.ENTREE
-                                ? "Entrée déjà enregistrée"
-                                : "Sortie déjà enregistrée"
-                );
+            if (last.getType() == PointageType.ENTREE) {
+                // آخر واحد كان دخول → الآن خروج
+                type = PointageType.SORTIE;
+            } else {
+                // آخر واحد كان خروج → الآن دخول
+                type = PointageType.ENTREE;
             }
         }
 
@@ -195,9 +190,11 @@ public class PointageService {
         pointage.setUser(user);
         pointage.setSite(site);
         pointage.setType(type);
-        pointage.setTimestamp(LocalDateTime.now());
+        pointage.setTimestamp(timestamp);
 
         Pointage saved = pointageRepository.save(pointage);
+
+        Long siteId = site.getId();
 
         messagingTemplate.convertAndSend(
                 "/topic/stats/" + siteId,

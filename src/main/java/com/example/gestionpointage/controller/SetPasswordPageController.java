@@ -1,8 +1,8 @@
 package com.example.gestionpointage.controller;
 
 import org.springframework.ui.Model;
+
 import com.example.gestionpointage.model.TokenType;
-import org.springframework.web.server.ResponseStatusException;
 import com.example.gestionpointage.service.SetPasswordService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
