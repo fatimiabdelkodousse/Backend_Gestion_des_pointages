@@ -60,55 +60,52 @@ public class PointageService {
     // 🔥 CENTRALIZED ATTENDANCE LOGIC (IMPORTANT)
     // =====================================================
 
-    private AttendanceStatus resolveAttendanceStatus(
-            Utilisateur user,
-            Long siteId,
-            LocalDate date
-    ) {
+	private AttendanceStatus resolveAttendanceStatus(
+	        Utilisateur user,
+	        Long siteId,
+	        LocalDate date
+	) {
 
-        LocalDateTime start = date.atStartOfDay();
-        LocalDateTime end   = date.atTime(23, 59, 59);
+	    LocalDateTime start = date.atStartOfDay();
+	    LocalDateTime end   = date.atTime(23, 59, 59);
 
-        LocalTime workStart      = LocalTime.of(9, 0);
-        LocalTime toleranceLimit = LocalTime.of(9, 5);
-        LocalTime absenceLimit   = LocalTime.of(18, 0);
+	    LocalTime workStart      = LocalTime.of(9, 0);
+	    LocalTime toleranceLimit = LocalTime.of(9, 5);
+	    LocalTime absenceLimit   = LocalTime.of(18, 0);
 
-        LocalDateTime now = LocalDateTime.now();
-        boolean isToday = date.equals(LocalDate.now());
-        boolean afterWorkDay = !isToday || now.isAfter(date.atTime(absenceLimit));
+	    LocalDateTime now = LocalDateTime.now();
+	    boolean isToday = date.equals(LocalDate.now());
+	    boolean afterWorkDay = !isToday || now.isAfter(date.atTime(absenceLimit));
 
-        var firstEntryOpt =
-                pointageRepository
-                        .findTopByUserAndSiteIdAndTypeAndTimestampBetweenOrderByTimestampAsc(
-                                user,
-                                siteId,
-                                PointageType.ENTREE,
-                                start,
-                                end
-                        );
+	    // ═══ 🔥 البحث بدون siteId ═══
+	    var firstEntryOpt =
+	            pointageRepository
+	                    .findTopByUserAndTypeAndTimestampBetweenOrderByTimestampAsc(
+	                            user,
+	                            PointageType.ENTREE,
+	                            start,
+	                            end
+	                    );
 
-        if (firstEntryOpt.isEmpty()) {
-            if (afterWorkDay) {
-                return AttendanceStatus.ABSENT;
-            }
-            return AttendanceStatus.ABSENT; 
-        }
+	    if (firstEntryOpt.isEmpty()) {
+	        return AttendanceStatus.ABSENT;
+	    }
 
-        LocalTime arrival =
-                firstEntryOpt.get()
-                        .getTimestamp()
-                        .toLocalTime();
+	    LocalTime arrival =
+	            firstEntryOpt.get()
+	                    .getTimestamp()
+	                    .toLocalTime();
 
-        if (arrival.isBefore(workStart)) {
-            return AttendanceStatus.EARLY;
-        }
+	    if (arrival.isBefore(workStart)) {
+	        return AttendanceStatus.EARLY;
+	    }
 
-        if (!arrival.isAfter(toleranceLimit)) {
-            return AttendanceStatus.ON_TIME;
-        }
+	    if (!arrival.isAfter(toleranceLimit)) {
+	        return AttendanceStatus.ON_TIME;
+	    }
 
-        return AttendanceStatus.LATE;
-    }
+	    return AttendanceStatus.LATE;
+	}
 
     // =====================================================
     // CREATE POINTAGE
