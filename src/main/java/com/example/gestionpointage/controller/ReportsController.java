@@ -37,7 +37,7 @@ public class ReportsController {
                 LocalDate.parse(date)
         );
     }
-    
+
     @GetMapping("/weekly")
     public List<WeeklyReportDTO> weekly(
             @RequestParam Long siteId,
@@ -61,24 +61,26 @@ public class ReportsController {
                 month
         );
     }
-    
+
+    // ═══════════════════════════════════════════════════
+    //  ✅ EXPORT DAILY
+    // ═══════════════════════════════════════════════════
+
     @GetMapping("/export/daily")
     public ResponseEntity<byte[]> exportDaily(
             @RequestParam Long siteId,
             @RequestParam String date
     ) throws Exception {
 
-        var rows =
-                pointageService.generateDailyReport(
-                        siteId,
-                        LocalDate.parse(date)
-                );
+        var rows = pointageService.generateDailyReport(
+                siteId,
+                LocalDate.parse(date)
+        );
 
         Workbook workbook = new XSSFWorkbook();
         Sheet sheet = workbook.createSheet("Daily Report");
 
         Row header = sheet.createRow(0);
-
         header.createCell(0).setCellValue("Nom");
         header.createCell(1).setCellValue("Prenom");
         header.createCell(2).setCellValue("Entree");
@@ -89,50 +91,51 @@ public class ReportsController {
         int rowIndex = 1;
 
         for (var r : rows) {
-
             Row row = sheet.createRow(rowIndex++);
-
             row.createCell(0).setCellValue(r.getNom());
             row.createCell(1).setCellValue(r.getPrenom());
             row.createCell(2).setCellValue(
-                    r.getHeureEntree() != null ?
-                            r.getHeureEntree().toString() : "");
+                    r.getHeureEntree() != null
+                            ? r.getHeureEntree().toString() : "");
             row.createCell(3).setCellValue(
-                    r.getHeureSortie() != null ?
-                            r.getHeureSortie().toString() : "");
+                    r.getHeureSortie() != null
+                            ? r.getHeureSortie().toString() : "");
             row.createCell(4).setCellValue(r.getTotalMinutes());
             row.createCell(5).setCellValue(r.getStatut());
         }
 
-        ByteArrayOutputStream out =
-                new ByteArrayOutputStream();
+        // ✅ عرض الأعمدة يدوياً بدل autoSizeColumn
+        setColumnWidths(sheet, 6);
 
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
         workbook.write(out);
         workbook.close();
 
         return ResponseEntity.ok()
                 .header("Content-Disposition",
-                        "attachment; filename=report.xlsx")
+                        "attachment; filename=daily_report.xlsx")
                 .body(out.toByteArray());
     }
-    
+
+    // ═══════════════════════════════════════════════════
+    //  ✅ EXPORT WEEKLY (مُصحّح)
+    // ═══════════════════════════════════════════════════
+
     @GetMapping("/export/weekly")
     public ResponseEntity<byte[]> exportWeekly(
             @RequestParam Long siteId,
             @RequestParam String date
     ) throws Exception {
 
-        var rows =
-                pointageService.generateWeeklyReport(
-                        siteId,
-                        LocalDate.parse(date)
-                );
+        var rows = pointageService.generateWeeklyReport(
+                siteId,
+                LocalDate.parse(date)
+        );
 
         Workbook workbook = new XSSFWorkbook();
         Sheet sheet = workbook.createSheet("Weekly Report");
 
         Row header = sheet.createRow(0);
-
         header.createCell(0).setCellValue("Nom");
         header.createCell(1).setCellValue("Prenom");
         header.createCell(2).setCellValue("Présences");
@@ -143,9 +146,7 @@ public class ReportsController {
         int rowIndex = 1;
 
         for (var r : rows) {
-
             Row row = sheet.createRow(rowIndex++);
-
             row.createCell(0).setCellValue(r.getNom());
             row.createCell(1).setCellValue(r.getPrenom());
             row.createCell(2).setCellValue(r.getJoursPresence());
@@ -154,9 +155,8 @@ public class ReportsController {
             row.createCell(5).setCellValue(r.getTotalMinutes());
         }
 
-        for (int i = 0; i < 6; i++) {
-            sheet.autoSizeColumn(i);
-        }
+        // ✅ عرض يدوي بدل autoSizeColumn
+        setColumnWidths(sheet, 6);
 
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         workbook.write(out);
@@ -167,7 +167,11 @@ public class ReportsController {
                         "attachment; filename=weekly_report.xlsx")
                 .body(out.toByteArray());
     }
-    
+
+    // ═══════════════════════════════════════════════════
+    //  ✅ EXPORT MONTHLY (مُصحّح)
+    // ═══════════════════════════════════════════════════
+
     @GetMapping("/export/monthly")
     public ResponseEntity<byte[]> exportMonthly(
             @RequestParam Long siteId,
@@ -175,18 +179,16 @@ public class ReportsController {
             @RequestParam int month
     ) throws Exception {
 
-        var rows =
-                pointageService.generateMonthlyReport(
-                        siteId,
-                        year,
-                        month
-                );
+        var rows = pointageService.generateMonthlyReport(
+                siteId,
+                year,
+                month
+        );
 
         Workbook workbook = new XSSFWorkbook();
         Sheet sheet = workbook.createSheet("Monthly Report");
 
         Row header = sheet.createRow(0);
-
         header.createCell(0).setCellValue("Nom");
         header.createCell(1).setCellValue("Prenom");
         header.createCell(2).setCellValue("Total Jours");
@@ -197,9 +199,7 @@ public class ReportsController {
         int rowIndex = 1;
 
         for (var r : rows) {
-
             Row row = sheet.createRow(rowIndex++);
-
             row.createCell(0).setCellValue(r.getNom());
             row.createCell(1).setCellValue(r.getPrenom());
             row.createCell(2).setCellValue(r.getTotalJoursTravail());
@@ -207,10 +207,9 @@ public class ReportsController {
             row.createCell(4).setCellValue(r.getAbsences());
             row.createCell(5).setCellValue(r.getTotalMinutes());
         }
-        
-        for (int i = 0; i < 6; i++) {
-            sheet.autoSizeColumn(i);
-        }
+
+        // ✅ عرض يدوي بدل autoSizeColumn
+        setColumnWidths(sheet, 6);
 
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         workbook.write(out);
@@ -220,5 +219,15 @@ public class ReportsController {
                 .header("Content-Disposition",
                         "attachment; filename=monthly_report.xlsx")
                 .body(out.toByteArray());
+    }
+
+    // ═══════════════════════════════════════════════════
+    //  ✅ HELPER: عرض أعمدة ثابت (بدل autoSizeColumn)
+    // ═══════════════════════════════════════════════════
+
+    private void setColumnWidths(Sheet sheet, int columnCount) {
+        for (int i = 0; i < columnCount; i++) {
+            sheet.setColumnWidth(i, 5000);  
+        }
     }
 }
