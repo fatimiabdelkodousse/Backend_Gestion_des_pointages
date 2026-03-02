@@ -39,14 +39,11 @@ public class SecurityConfig {
                 .requestMatchers("/error").permitAll()
                 .requestMatchers("/ws/**").permitAll()
 
-                // 📁 uploads
-                .requestMatchers("/uploads/**")
-                .hasAnyRole("ADMIN", "USER")
-
                 // 👤 Admin only
                 .requestMatchers("/users/**").hasRole("ADMIN")
                 .requestMatchers("/admin/**").hasRole("ADMIN")
                 .requestMatchers("/sites/**").hasRole("ADMIN")
+                .requestMatchers("/uploads/**").hasRole("ADMIN")
 
                 .anyRequest().authenticated()
             )

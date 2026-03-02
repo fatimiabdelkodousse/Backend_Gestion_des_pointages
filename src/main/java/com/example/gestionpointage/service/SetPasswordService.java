@@ -53,12 +53,6 @@ public class SetPasswordService {
 
         authCredentialsService.setPassword(user, password);
 
-        // 🔐 فقط في حالة ACTIVATION
-        if (accountToken.getType() == TokenType.ACTIVATION) {
-            user.setActive(true);
-            utilisateurRepository.save(user);
-        }
-
         accountToken.setUsed(true);
         accountTokenRepository.save(accountToken);
     }
@@ -97,7 +91,7 @@ public class SetPasswordService {
             );
         }
 
-        return accountToken.getType(); // ACTIVATION أو RESET
+        return accountToken.getType(); 
     }
 
 

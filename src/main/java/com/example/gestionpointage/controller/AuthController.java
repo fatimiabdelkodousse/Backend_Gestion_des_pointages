@@ -87,13 +87,6 @@ public class AuthController {
                         )
                 );
 
-        if (!user.isActive()) {
-            throw new ResponseStatusException(
-                    HttpStatus.UNAUTHORIZED,
-                    "Account not activated"
-            );
-        }
-
         AuthCredentials credentials = authRepo
                 .findByUtilisateur(user)
                 .orElseThrow(() ->

@@ -26,7 +26,6 @@ public class UtilisateurService {
 
     public Utilisateur createUserWithBadge(CreateUserWithBadgeDTO dto) {
 
-        // 🔎 البحث عن مستخدم بنفس الإيميل
         Utilisateur existingUser =
                 utilisateurRepository.findByEmail(dto.email).orElse(null);
 
@@ -34,12 +33,10 @@ public class UtilisateurService {
 
         if (existingUser != null) {
 
-            // ❌ إذا موجود وغير محذوف → نرفض
             if (!existingUser.isDeleted()) {
                 throw new RuntimeException("Email already exists");
             }
 
-            // ♻️ إذا محذوف → نعيد تفعيله
             user = existingUser;
             user.setDeleted(false);
             user.setActive(true);
