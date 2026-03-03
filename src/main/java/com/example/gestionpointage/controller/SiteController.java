@@ -113,4 +113,17 @@ public class SiteController {
                 saved.isActive()
         );
     }
+    
+    @GetMapping("/active")
+    public List<SiteDTO> getActiveSites() {
+        return siteRepository.findByActiveTrue()
+                .stream()
+                .map(s -> new SiteDTO(
+                        s.getId(),
+                        s.getName(),
+                        s.getAddress(),
+                        s.isActive()
+                ))
+                .toList();
+    }
 }

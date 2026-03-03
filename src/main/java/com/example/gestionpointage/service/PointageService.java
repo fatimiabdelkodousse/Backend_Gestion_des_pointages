@@ -56,16 +56,12 @@ public class PointageService {
         this.messagingTemplate = messagingTemplate;
     }
 
-    // =====================================================
-    // 🔧 HELPER: حدود اليوم (مُوحّد في كل مكان)
-    // =====================================================
-
     private LocalDateTime startOfDay(LocalDate date) {
         return date.atStartOfDay();
     }
 
     private LocalDateTime endOfDay(LocalDate date) {
-        return date.atTime(LocalTime.MAX);  // ✅ 23:59:59.999999999
+        return date.atTime(LocalTime.MAX);  
     }
 
     // =====================================================
@@ -79,12 +75,11 @@ public class PointageService {
     ) {
 
         LocalDateTime start = startOfDay(date);
-        LocalDateTime end   = endOfDay(date);       // ✅ FIX 3
+        LocalDateTime end   = endOfDay(date);     
 
         LocalTime workStart      = LocalTime.of(9, 0);
         LocalTime toleranceLimit = LocalTime.of(9, 5);
 
-        // ═══ البحث عن أول ENTREE في نفس اليوم ═══
         var firstEntryOpt =
                 pointageRepository
                         .findTopByUserAndTypeAndTimestampBetweenOrderByTimestampAsc(
@@ -174,6 +169,13 @@ public class PointageService {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
                     "Aucun site associé à cet utilisateur"
+            );
+        }
+        
+        if (!site.isActive()) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "Le site « " + site.getName() + " » est désactivé"
             );
         }
 
