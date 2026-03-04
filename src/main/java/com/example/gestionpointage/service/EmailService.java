@@ -33,11 +33,26 @@ public class EmailService {
             request.setMethod(Method.POST);
             request.setEndpoint("mail/send");
             request.setBody(mail.build());
+   
+            Response response = sg.api(request);
 
-            sg.api(request);
+            if (response.getStatusCode() < 200
+                    || response.getStatusCode() >= 300) {
+
+                System.err.println(
+                        "SendGrid ERROR: status="
+                                + response.getStatusCode()
+                                + " body=" + response.getBody()
+                                + " to=" + to
+                                + " subject=" + subject
+                );
+            }
 
         } catch (IOException e) {
-            throw new RuntimeException("Failed to send email to: " + to, e);
+            System.err.println(
+                    "SendGrid EXCEPTION: " + e.getMessage()
+                            + " to=" + to
+            );
         }
     }
 
