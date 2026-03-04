@@ -1,7 +1,6 @@
 package com.example.gestionpointage.controller;
 
 import com.example.gestionpointage.dto.LoginRequestDTO;
-
 import com.example.gestionpointage.entity.UserDevice;
 import com.example.gestionpointage.dto.LoginResponseDTO;
 import com.example.gestionpointage.dto.ForgotPasswordRequestDTO;
@@ -15,6 +14,7 @@ import com.example.gestionpointage.repository.AuthCredentialsRepository;
 import com.example.gestionpointage.repository.UtilisateurRepository;
 import com.example.gestionpointage.security.PasswordHashUtil;
 import com.example.gestionpointage.security.LoginProtectionService;
+import com.example.gestionpointage.security.RequestUtil;
 import com.example.gestionpointage.service.ForgotPasswordService;
 import com.example.gestionpointage.security.JwtService;
 import com.example.gestionpointage.security.RefreshTokenService;
@@ -63,7 +63,6 @@ public class AuthController {
         this.refreshTokenService = refreshTokenService;
         this.userDeviceRepository = userDeviceRepository;
         this.emailService = emailService;
-        
     }
 
     @PostMapping("/login")
@@ -72,8 +71,13 @@ public class AuthController {
             HttpServletRequest request
     ) {
 
-        String ip = request.getRemoteAddr();
-        String userAgent = request.getHeader("User-Agent");
+        String ip = RequestUtil.getClientIp(request);
+
+        String userAgent = request.getHeader("X-Device-Info");
+        if (userAgent == null || userAgent.isBlank()) {
+            userAgent = request.getHeader("User-Agent");
+        }
+
         String key = "LOGIN:" + ip + ":" + dto.email;
 
         loginProtectionService.check(key);
@@ -111,7 +115,7 @@ public class AuthController {
         loginProtectionService.success(key);
 
         // ==========================================
-        // 🔐 Suspicious Login Detection هنا بالضبط
+        // 🔐 Suspicious Login Detection
         // ==========================================
 
         String deviceHash =
@@ -125,7 +129,6 @@ public class AuthController {
 
         if (deviceOpt.isEmpty()) {
 
-            // 🚨 جهاز جديد
             UserDevice newDevice = new UserDevice();
             newDevice.setUser(user);
             newDevice.setDeviceHash(deviceHash);
@@ -137,7 +140,6 @@ public class AuthController {
 
             userDeviceRepository.save(newDevice);
 
-            // 📧 إرسال تنبيه
             emailService.sendSuspiciousLoginAlert(
                     user.getEmail(),
                     ip,
@@ -150,10 +152,6 @@ public class AuthController {
             device.setLastSeen(LocalDateTime.now());
             userDeviceRepository.save(device);
         }
-
-        // ==========================================
-        // 🔐 إنشاء التوكنات
-        // ==========================================
 
         String accessToken = jwtService.generateAccessToken(
                 user.getId().toString(),
@@ -177,11 +175,12 @@ public class AuthController {
                 badge != null ? badge.getBadgeUid() : null,
                 badge != null ? badge.isActive() : null,
                 user.getImagePath(),
-                user.getSite() != null ? user.getSite().getId() : null,  // ← جديد
+                user.getSite() != null ? user.getSite().getId() : null,
                 accessToken,
                 refreshToken
         );
     }
+
     @PostMapping("/forgot-password")
     public ResponseEntity<?> forgotPassword(
             @RequestBody ForgotPasswordRequestDTO dto,
@@ -193,13 +192,14 @@ public class AuthController {
                 dto.getNom(),
                 dto.getPrenom(),
                 dto.getBadgeUid(),
-                request.getRemoteAddr()
+                RequestUtil.getClientIp(request)  
         );
 
         return ResponseEntity.ok(
                 "Reset link sent successfully."
         );
     }
+
     @GetMapping("/me")
     public MeResponseDTO me(
             Authentication authentication
@@ -208,20 +208,22 @@ public class AuthController {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
         }
 
-        // userId محفوظ في JWT كـ subject
         Long userId = Long.parseLong(authentication.getName());
 
         Utilisateur user = utilisateurRepository.findById(userId)
-            .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
+                .orElseThrow(() ->
+                        new ResponseStatusException(HttpStatus.UNAUTHORIZED)
+                );
 
         return new MeResponseDTO(
-            user.getId(),
-            user.getEmail(),
-            user.getRole().name(),
-            user.getPrenom(),
-            user.getNom()
+                user.getId(),
+                user.getEmail(),
+                user.getRole().name(),
+                user.getPrenom(),
+                user.getNom()
         );
     }
+
     @PostMapping("/refresh")
     public RefreshTokenResponseDTO refresh(
             @RequestBody RefreshTokenRequestDTO dto,
@@ -229,8 +231,12 @@ public class AuthController {
     ) {
         String rawRefreshToken = dto.refreshToken;
 
-        String ip = request.getRemoteAddr();
-        String userAgent = request.getHeader("User-Agent");
+        String ip = RequestUtil.getClientIp(request);  
+
+        String userAgent = request.getHeader("X-Device-Info");
+        if (userAgent == null || userAgent.isBlank()) {
+            userAgent = request.getHeader("User-Agent");
+        }
 
         return refreshTokenService.rotate(
                 rawRefreshToken,
@@ -238,6 +244,7 @@ public class AuthController {
                 userAgent
         );
     }
+
     @PostMapping("/logout")
     public ResponseEntity<Void> logout(
             @RequestBody RefreshTokenRequestDTO dto
