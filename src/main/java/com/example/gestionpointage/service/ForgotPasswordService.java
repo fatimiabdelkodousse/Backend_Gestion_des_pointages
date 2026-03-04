@@ -119,7 +119,7 @@ public class ForgotPasswordService {
 
         tokenRepository.save(t);
 
-        String link = "https://gestion-pointage.up.railway.app/reset-password?token=" + token;
+        String link = "https://gestion-pointages.up.railway.app/reset-password?token=" + token;
 
         // ═══ Email envoyé de manière asynchrone ═══
         emailService.sendResetLinkEmail(

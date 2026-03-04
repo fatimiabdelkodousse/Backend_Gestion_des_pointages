@@ -42,22 +42,6 @@ public class EmailService {
     }
 
     @Async("taskExecutor")
-    public void sendActivationLinkEmail(
-            String to, String prenom, String nom, String link) {
-
-        String html = buildActionEmail(
-                prenom + " " + nom,
-                "Votre compte a été créé avec succès. Veuillez l'activer en cliquant sur le bouton ci-dessous.",
-                link,
-                "Activer mon compte",
-                "#6C63FF",
-                "Ce lien expire dans 24 heures."
-        );
-
-        send(to, "Activation de votre compte", html);
-    }
-
-    @Async("taskExecutor")
     public void sendResetLinkEmail(
             String to, String prenom, String nom, String link) {
 
