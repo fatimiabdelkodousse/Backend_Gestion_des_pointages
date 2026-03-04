@@ -22,7 +22,7 @@ public class EmailService {
 
     private void send(String to, String subject, String htmlBody) {
         try {
-            Email from = new Email(fromEmail);
+            Email from = new Email(fromEmail, "Gestion Pointage");
             Email toEmail = new Email(to);
             Content content = new Content("text/html", htmlBody);
             Mail mail = new Mail(from, subject, toEmail, content);
@@ -33,26 +33,11 @@ public class EmailService {
             request.setMethod(Method.POST);
             request.setEndpoint("mail/send");
             request.setBody(mail.build());
-   
-            Response response = sg.api(request);
 
-            if (response.getStatusCode() < 200
-                    || response.getStatusCode() >= 300) {
-
-                System.err.println(
-                        "SendGrid ERROR: status="
-                                + response.getStatusCode()
-                                + " body=" + response.getBody()
-                                + " to=" + to
-                                + " subject=" + subject
-                );
-            }
+            sg.api(request);
 
         } catch (IOException e) {
-            System.err.println(
-                    "SendGrid EXCEPTION: " + e.getMessage()
-                            + " to=" + to
-            );
+            throw new RuntimeException(e);
         }
     }
 
@@ -60,11 +45,12 @@ public class EmailService {
     public void sendActivationLinkEmail(
             String to, String prenom, String nom, String link) {
 
-        String html = buildEmailTemplate(
+        String html = buildActionEmail(
                 prenom + " " + nom,
-                "Votre compte a été créé. Veuillez l'activer en cliquant sur le bouton ci-dessous.",
+                "Votre compte a été créé avec succès. Veuillez l'activer en cliquant sur le bouton ci-dessous.",
                 link,
                 "Activer mon compte",
+                "#6C63FF",
                 "Ce lien expire dans 24 heures."
         );
 
@@ -75,11 +61,12 @@ public class EmailService {
     public void sendResetLinkEmail(
             String to, String prenom, String nom, String link) {
 
-        String html = buildEmailTemplate(
+        String html = buildActionEmail(
                 prenom + " " + nom,
-                "Vous avez demandé la réinitialisation de votre mot de passe. Cliquez sur le bouton ci-dessous pour continuer.",
+                "Vous avez demandé la réinitialisation de votre mot de passe. Cliquez sur le bouton ci-dessous pour définir un nouveau mot de passe.",
                 link,
                 "Réinitialiser le mot de passe",
+                "#6C63FF",
                 "Ce lien expire dans 5 minutes."
         );
 
@@ -90,110 +77,131 @@ public class EmailService {
     public void sendSuspiciousLoginAlert(
             String email, String ip, String userAgent) {
 
-        String html = """
-            <!DOCTYPE html>
-            <html>
-            <head><meta charset="UTF-8"></head>
-            <body style="margin:0;padding:0;background:#F5F6FA;font-family:'Segoe UI',Arial,sans-serif;">
-              <table width="100%%" cellpadding="0" cellspacing="0" style="padding:40px 20px;">
-                <tr><td align="center">
-                  <table width="420" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:18px;box-shadow:0 2px 12px rgba(0,0,0,0.04);padding:36px 32px;">
-                    <tr><td align="center" style="padding-bottom:24px;">
-                      <div style="width:56px;height:56px;background:rgba(255,152,0,0.1);border-radius:50%%;display:inline-flex;align-items:center;justify-content:center;">
-                        <span style="font-size:28px;">⚠️</span>
-                      </div>
-                    </td></tr>
-                    <tr><td align="center" style="font-size:20px;font-weight:700;color:#1a1a2e;padding-bottom:16px;">
-                      Connexion suspecte détectée
-                    </td></tr>
-                    <tr><td style="font-size:14px;color:#666;line-height:1.7;padding-bottom:20px;">
-                      Une nouvelle connexion a été détectée sur votre compte :
-                    </td></tr>
-                    <tr><td style="background:#F5F6FA;border-radius:12px;padding:16px 20px;margin-bottom:20px;">
-                      <table width="100%%">
-                        <tr>
-                          <td style="font-size:13px;color:#999;padding:4px 0;">Adresse IP</td>
-                          <td style="font-size:13px;font-weight:600;color:#1a1a2e;text-align:right;">%s</td>
-                        </tr>
-                        <tr>
-                          <td style="font-size:13px;color:#999;padding:4px 0;">Appareil</td>
-                          <td style="font-size:13px;font-weight:600;color:#1a1a2e;text-align:right;">%s</td>
-                        </tr>
-                      </table>
-                    </td></tr>
-                    <tr><td style="font-size:13px;color:#999;padding-top:20px;line-height:1.6;">
-                      Si ce n'était pas vous, veuillez changer votre mot de passe immédiatement depuis l'application.
-                    </td></tr>
-                  </table>
-                </td></tr>
-              </table>
-            </body>
-            </html>
-            """.formatted(ip, userAgent);
-
-        send(email, "⚠ Connexion suspecte détectée", html);
+        String html = buildAlertEmail(ip, userAgent);
+        send(email, "Connexion suspecte détectée", html);
     }
 
-    private String buildEmailTemplate(
+    private String buildActionEmail(
             String name,
             String message,
             String link,
             String buttonText,
+            String buttonColor,
             String footer
     ) {
-        return """
-            <!DOCTYPE html>
-            <html>
-            <head><meta charset="UTF-8"></head>
-            <body style="margin:0;padding:0;background:#F5F6FA;font-family:'Segoe UI',Arial,sans-serif;">
-              <table width="100%%" cellpadding="0" cellspacing="0" style="padding:40px 20px;">
-                <tr><td align="center">
-                  <table width="420" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:18px;box-shadow:0 2px 12px rgba(0,0,0,0.04);padding:36px 32px;">
+        return "<!DOCTYPE html>"
+                + "<html><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1.0\"></head>"
+                + "<body style=\"margin:0;padding:0;background-color:#f4f5f9;font-family:Arial,Helvetica,sans-serif;\">"
+                + "<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"padding:40px 16px;\">"
+                + "<tr><td align=\"center\">"
 
-                    <!-- Logo -->
-                    <tr><td align="center" style="padding-bottom:28px;">
-                      <div style="width:56px;height:56px;background:linear-gradient(135deg,#6C63FF,#9C55F7);border-radius:14px;display:inline-block;text-align:center;line-height:56px;">
-                        <span style="font-size:28px;color:white;">🔒</span>
-                      </div>
-                    </td></tr>
+                // Container
+                + "<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:460px;background-color:#ffffff;border-radius:16px;overflow:hidden;\">"
 
-                    <!-- Greeting -->
-                    <tr><td style="font-size:15px;color:#1a1a2e;padding-bottom:8px;">
-                      Bonjour <strong>%s</strong>,
-                    </td></tr>
+                // Header bar
+                + "<tr><td style=\"background-color:" + buttonColor + ";padding:24px 32px;text-align:center;\">"
+                + "<span style=\"font-size:32px;\">&#128274;</span>"
+                + "</td></tr>"
 
-                    <!-- Message -->
-                    <tr><td style="font-size:14px;color:#666;line-height:1.7;padding-bottom:28px;">
-                      %s
-                    </td></tr>
+                // Body
+                + "<tr><td style=\"padding:32px 28px 12px;\">"
+                + "<p style=\"margin:0 0 6px;font-size:15px;color:#333333;\">Bonjour <strong>" + escapeHtml(name) + "</strong>,</p>"
+                + "<p style=\"margin:0;font-size:14px;color:#666666;line-height:1.6;\">" + escapeHtml(message) + "</p>"
+                + "</td></tr>"
 
-                    <!-- Button -->
-                    <tr><td align="center" style="padding-bottom:28px;">
-                      <a href="%s"
-                         style="display:inline-block;
-                                padding:14px 36px;
-                                background:linear-gradient(135deg,#6C63FF,#9C55F7);
-                                color:#ffffff;
-                                text-decoration:none;
-                                border-radius:14px;
-                                font-size:15px;
-                                font-weight:700;
-                                box-shadow:0 4px 16px rgba(108,99,255,0.3);">
-                        %s
-                      </a>
-                    </td></tr>
+                // Button
+                + "<tr><td align=\"center\" style=\"padding:20px 28px 28px;\">"
+                + "<a href=\"" + link + "\" style=\"display:inline-block;padding:14px 40px;"
+                + "background-color:" + buttonColor + ";color:#ffffff;text-decoration:none;"
+                + "border-radius:8px;font-size:15px;font-weight:bold;\">"
+                + escapeHtml(buttonText)
+                + "</a>"
+                + "</td></tr>"
 
-                    <!-- Footer -->
-                    <tr><td style="border-top:1px solid #eee;padding-top:20px;font-size:12px;color:#999;line-height:1.6;">
-                      %s<br>
-                      Si vous n'avez pas fait cette demande, ignorez cet e-mail.
-                    </td></tr>
+                // Footer
+                + "<tr><td style=\"padding:0 28px 24px;\">"
+                + "<hr style=\"border:none;border-top:1px solid #eeeeee;margin:0 0 16px;\">"
+                + "<p style=\"margin:0;font-size:12px;color:#999999;line-height:1.5;\">"
+                + escapeHtml(footer) + "<br>"
+                + "Si vous n'avez pas fait cette demande, ignorez cet e-mail."
+                + "</p>"
+                + "</td></tr>"
 
-                  </table>
-                </td></tr>
-              </table>
-            </body>
-            </html>
-            """.formatted(name, message, link, buttonText, footer);
+                + "</table>"
+                + "</td></tr></table>"
+                + "</body></html>";
+    }
+
+    private String buildAlertEmail(String ip, String userAgent) {
+
+        return "<!DOCTYPE html>"
+                + "<html><head><meta charset=\"UTF-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1.0\"></head>"
+                + "<body style=\"margin:0;padding:0;background-color:#f4f5f9;font-family:Arial,Helvetica,sans-serif;\">"
+                + "<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"padding:40px 16px;\">"
+                + "<tr><td align=\"center\">"
+
+                // Container
+                + "<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"max-width:460px;background-color:#ffffff;border-radius:16px;overflow:hidden;\">"
+
+                // Header bar (orange)
+                + "<tr><td style=\"background-color:#FF9800;padding:24px 32px;text-align:center;\">"
+                + "<span style=\"font-size:32px;\">&#9888;&#65039;</span>"
+                + "</td></tr>"
+
+                // Title
+                + "<tr><td style=\"padding:28px 28px 8px;text-align:center;\">"
+                + "<p style=\"margin:0;font-size:18px;font-weight:bold;color:#1a1a2e;\">Connexion suspecte d&eacute;tect&eacute;e</p>"
+                + "</td></tr>"
+
+                // Message
+                + "<tr><td style=\"padding:8px 28px 20px;\">"
+                + "<p style=\"margin:0;font-size:14px;color:#666666;line-height:1.6;\">"
+                + "Une nouvelle connexion a &eacute;t&eacute; d&eacute;tect&eacute;e sur votre compte :"
+                + "</p>"
+                + "</td></tr>"
+
+                // Info table
+                + "<tr><td style=\"padding:0 28px 24px;\">"
+                + "<table role=\"presentation\" width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background-color:#f8f8fb;border-radius:10px;\">"
+
+                // IP row
+                + "<tr>"
+                + "<td style=\"padding:12px 16px;font-size:13px;color:#999999;border-bottom:1px solid #eeeeee;\">Adresse IP</td>"
+                + "<td style=\"padding:12px 16px;font-size:13px;font-weight:bold;color:#1a1a2e;text-align:right;border-bottom:1px solid #eeeeee;\">"
+                + escapeHtml(ip)
+                + "</td>"
+                + "</tr>"
+
+                // Device row
+                + "<tr>"
+                + "<td style=\"padding:12px 16px;font-size:13px;color:#999999;\">Appareil</td>"
+                + "<td style=\"padding:12px 16px;font-size:13px;font-weight:bold;color:#1a1a2e;text-align:right;\">"
+                + escapeHtml(userAgent)
+                + "</td>"
+                + "</tr>"
+
+                + "</table>"
+                + "</td></tr>"
+
+                // Warning footer
+                + "<tr><td style=\"padding:0 28px 28px;\">"
+                + "<hr style=\"border:none;border-top:1px solid #eeeeee;margin:0 0 16px;\">"
+                + "<p style=\"margin:0;font-size:12px;color:#999999;line-height:1.5;\">"
+                + "Si ce n'&eacute;tait pas vous, veuillez changer votre mot de passe imm&eacute;diatement depuis l'application."
+                + "</p>"
+                + "</td></tr>"
+
+                + "</table>"
+                + "</td></tr></table>"
+                + "</body></html>";
+    }
+
+    private String escapeHtml(String input) {
+        if (input == null) return "";
+        return input
+                .replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+                .replace("\"", "&quot;");
     }
 }
