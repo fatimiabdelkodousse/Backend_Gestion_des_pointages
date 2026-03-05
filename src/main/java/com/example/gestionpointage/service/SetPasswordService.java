@@ -1,8 +1,6 @@
 package com.example.gestionpointage.service;
 
 import com.example.gestionpointage.entity.AccountToken;
-
-
 import com.example.gestionpointage.model.TokenType;
 import com.example.gestionpointage.model.Utilisateur;
 import com.example.gestionpointage.repository.AccountTokenRepository;
@@ -34,14 +32,21 @@ public class SetPasswordService {
 
     public void validateToken(String token) {
 
+        System.out.println("🔍 Validating token hash...");
+
         AccountToken accountToken = getValidToken(token);
 
         if (accountToken.getExpiresAt().isBefore(LocalDateTime.now())) {
+            System.out.println("❌ Token expired at: "
+                    + accountToken.getExpiresAt());
             throw new ResponseStatusException(
-                HttpStatus.BAD_REQUEST,
-                "Token expired"
+                    HttpStatus.BAD_REQUEST,
+                    "Token expired"
             );
         }
+
+        System.out.println("✅ Token is valid, expires at: "
+                + accountToken.getExpiresAt());
     }
 
     public void activateAccount(String token, String password) {
@@ -49,50 +54,40 @@ public class SetPasswordService {
         PasswordPolicy.validate(password);
 
         AccountToken accountToken = getValidToken(token);
+
+        // ✅ تحقق من الصلاحية هنا أيضاً
+        if (accountToken.getExpiresAt().isBefore(LocalDateTime.now())) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Token expired"
+            );
+        }
+
         Utilisateur user = accountToken.getUtilisateur();
 
         authCredentialsService.setPassword(user, password);
 
         accountToken.setUsed(true);
         accountTokenRepository.save(accountToken);
+
+        System.out.println("✅ Password set for user: " + user.getId());
     }
 
     private AccountToken getValidToken(String token) {
 
         String tokenHash = TokenHashUtil.hash(token);
 
+        System.out.println("🔍 Looking for token hash: "
+                + tokenHash.substring(0, 8) + "...");
+
         return accountTokenRepository
-            .findByTokenHashAndUsedFalse(tokenHash)
-            .orElseThrow(() ->
-                new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "Invalid token"
-                )
-            );
+                .findByTokenHashAndUsedFalse(tokenHash)
+                .orElseThrow(() -> {
+                    System.out.println("❌ Token not found or already used");
+                    return new ResponseStatusException(
+                            HttpStatus.BAD_REQUEST,
+                            "Invalid token"
+                    );
+                });
     }
-    
-    public TokenType validateAndGetType(String token) {
-
-        String tokenHash = TokenHashUtil.hash(token);
-
-        AccountToken accountToken = accountTokenRepository
-            .findByTokenHashAndUsedFalse(tokenHash)
-            .orElseThrow(() ->
-                new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "Invalid or expired token"
-                )
-            );
-
-        if (accountToken.getExpiresAt().isBefore(LocalDateTime.now())) {
-            throw new ResponseStatusException(
-                HttpStatus.BAD_REQUEST,
-                "Token expired"
-            );
-        }
-
-        return accountToken.getType(); 
-    }
-
-
 }

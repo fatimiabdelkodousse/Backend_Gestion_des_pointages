@@ -19,10 +19,16 @@ public class SetPasswordPageController {
             @RequestParam String token
     ) {
         try {
-            // ✅ فقط التحقق من صلاحية الـ token
+            System.out.println("🔑 Reset page requested with token length: "
+                    + token.length());
+
             setPasswordService.validateToken(token);
+
+            System.out.println("✅ Token validated successfully");
             return "set-password";
+
         } catch (Exception e) {
+            System.out.println("❌ Token validation failed: " + e.getMessage());
             return "token-invalid";
         }
     }

@@ -13,9 +13,10 @@ import org.springframework.web.server.ResponseStatusException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Optional;
 
 @Service
 public class ForgotPasswordService {
@@ -53,7 +54,6 @@ public class ForgotPasswordService {
                 ? null
                 : badgeUid.trim();
 
-        // ✅ Log لتسهيل التشخيص
         System.out.println("🔍 Forgot password request:");
         System.out.println("   email: " + email);
         System.out.println("   nom: " + nom);
@@ -78,30 +78,16 @@ public class ForgotPasswordService {
         System.out.println("✅ User found: " + user.getId()
                 + " - " + user.getNom() + " " + user.getPrenom());
 
-        // ==============================
-        // 🔐 RATE LIMIT (5 min)
-        // ==============================
+        // ══════════════════════════════════════════════════
+        // ✅ FIX 2: success() بعد التحقق من المستخدم
+        //    بدون هذا، كل طلب يُحسب كفشل ويُحظر بعد عدة محاولات
+        // ══════════════════════════════════════════════════
+        protectionService.success(key);
 
-        Optional<AccountToken> existingToken =
-                tokenRepository.findTopByUtilisateurAndTypeAndUsedFalseOrderByCreatedAtDesc(
-                        user,
-                        TokenType.RESET
-                );
-
-        if (existingToken.isPresent()) {
-            AccountToken lastToken = existingToken.get();
-            if (lastToken.getCreatedAt()
-                    .isAfter(LocalDateTime.now().minusMinutes(5))) {
-                throw new ResponseStatusException(
-                        HttpStatus.TOO_MANY_REQUESTS,
-                        "Please wait before requesting another reset link."
-                );
-            }
-        }
-
-        // ==============================
-        // 🧹 Invalider les anciens tokens
-        // ==============================
+        // ══════════════════════════════════════════════════
+        // 🧹 إبطال جميع التوكنات القديمة
+        //    (حذف Rate Limit المنفصل - LoginProtection يكفي)
+        // ══════════════════════════════════════════════════
 
         List<AccountToken> oldTokens =
                 tokenRepository.findByUtilisateurAndTypeAndUsedFalse(
@@ -114,12 +100,12 @@ public class ForgotPasswordService {
             tokenRepository.save(old);
         }
 
-        // ==============================
-        // 🔑 Nouveau token
-        // ==============================
+        // ══════════════════════════════════════════════════
+        // 🔑 إنشاء توكن جديد
+        // ══════════════════════════════════════════════════
 
         String token = SecureTokenGenerator.generate();
-        String hash = TokenHashUtil.hash(token);
+        String hash  = TokenHashUtil.hash(token);
 
         AccountToken t = new AccountToken();
         t.setUtilisateur(user);
@@ -129,12 +115,14 @@ public class ForgotPasswordService {
         t.setUsed(false);
 
         tokenRepository.save(t);
+        
+        String encodedToken = URLEncoder.encode(token, StandardCharsets.UTF_8);
 
-        String link = "https://gestion-pointage.up.railway.app/reset-password?token=" + token;
+        String link = "https://gestion-pointage.up.railway.app/reset-password?token="
+                + encodedToken;
 
         System.out.println("🔗 Reset link generated for: " + user.getEmail());
 
-        // ✅ Email avec try-catch pour ne pas bloquer la réponse
         try {
             emailService.sendResetLinkEmail(
                     user.getEmail(),
@@ -142,11 +130,10 @@ public class ForgotPasswordService {
                     user.getNom(),
                     link
             );
-            System.out.println("✅ Email sent to: " + user.getEmail());
+            System.out.println("✅ Email queued for: " + user.getEmail());
         } catch (Exception e) {
             System.out.println("❌ Email sending failed: " + e.getMessage());
             e.printStackTrace();
-            // Ne pas faire échouer la requête si l'email échoue
         }
     }
 }
