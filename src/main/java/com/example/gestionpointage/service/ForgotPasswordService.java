@@ -53,6 +53,13 @@ public class ForgotPasswordService {
                 ? null
                 : badgeUid.trim();
 
+        // ✅ Log لتسهيل التشخيص
+        System.out.println("🔍 Forgot password request:");
+        System.out.println("   email: " + email);
+        System.out.println("   nom: " + nom);
+        System.out.println("   prenom: " + prenom);
+        System.out.println("   badgeUid: " + normalizedBadgeUid);
+
         Utilisateur user = utilisateurRepository
                 .findActiveUserForPasswordReset(
                         email.trim(),
@@ -60,12 +67,16 @@ public class ForgotPasswordService {
                         prenom.trim(),
                         normalizedBadgeUid
                 )
-                .orElseThrow(() ->
-                        new ResponseStatusException(
-                                HttpStatus.BAD_REQUEST,
-                                "Informations incorrectes"
-                        )
-                );
+                .orElseThrow(() -> {
+                    System.out.println("❌ User not found for password reset");
+                    return new ResponseStatusException(
+                            HttpStatus.BAD_REQUEST,
+                            "Informations incorrectes"
+                    );
+                });
+
+        System.out.println("✅ User found: " + user.getId()
+                + " - " + user.getNom() + " " + user.getPrenom());
 
         // ==============================
         // 🔐 RATE LIMIT (5 min)
@@ -89,7 +100,7 @@ public class ForgotPasswordService {
         }
 
         // ==============================
-        // 🧹 Invalider les anciens tokens (UPDATE au lieu de DELETE)
+        // 🧹 Invalider les anciens tokens
         // ==============================
 
         List<AccountToken> oldTokens =
@@ -114,19 +125,28 @@ public class ForgotPasswordService {
         t.setUtilisateur(user);
         t.setTokenHash(hash);
         t.setType(TokenType.RESET);
-        t.setExpiresAt(LocalDateTime.now().plusMinutes(5));
+        t.setExpiresAt(LocalDateTime.now().plusMinutes(15));
         t.setUsed(false);
 
         tokenRepository.save(t);
 
-        String link = "https://gestion-pointages.up.railway.app/reset-password?token=" + token;
+        String link = "https://gestion-pointage.up.railway.app/reset-password?token=" + token;
 
-        // ═══ Email envoyé de manière asynchrone ═══
-        emailService.sendResetLinkEmail(
-                user.getEmail(),
-                user.getPrenom(),
-                user.getNom(),
-                link
-        );
+        System.out.println("🔗 Reset link generated for: " + user.getEmail());
+
+        // ✅ Email avec try-catch pour ne pas bloquer la réponse
+        try {
+            emailService.sendResetLinkEmail(
+                    user.getEmail(),
+                    user.getPrenom(),
+                    user.getNom(),
+                    link
+            );
+            System.out.println("✅ Email sent to: " + user.getEmail());
+        } catch (Exception e) {
+            System.out.println("❌ Email sending failed: " + e.getMessage());
+            e.printStackTrace();
+            // Ne pas faire échouer la requête si l'email échoue
+        }
     }
 }

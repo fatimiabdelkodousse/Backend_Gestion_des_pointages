@@ -84,8 +84,9 @@ public interface UtilisateurRepository extends JpaRepository<Utilisateur, Long> 
     	    WHERE LOWER(u.email) = LOWER(:email)
     	    AND LOWER(u.nom) = LOWER(:nom)
     	    AND LOWER(u.prenom) = LOWER(:prenom)
-    	    AND (:badgeUid IS NULL OR :badgeUid = '' OR b.badgeUid = :badgeUid)
+    	    AND (:badgeUid IS NULL OR :badgeUid = '' OR LOWER(b.badgeUid) = LOWER(:badgeUid))
     	    AND u.active = true
+    	    AND u.deleted = false
     	""")
     	Optional<Utilisateur> findActiveUserForPasswordReset(
     	        String email,

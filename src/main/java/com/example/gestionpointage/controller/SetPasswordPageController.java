@@ -1,8 +1,5 @@
 package com.example.gestionpointage.controller;
 
-import org.springframework.ui.Model;
-
-import com.example.gestionpointage.model.TokenType;
 import com.example.gestionpointage.service.SetPasswordService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -19,17 +16,12 @@ public class SetPasswordPageController {
 
     @GetMapping("/reset-password")
     public String showSetPasswordPage(
-            @RequestParam String token,
-            Model model
+            @RequestParam String token
     ) {
         try {
-            TokenType type = setPasswordService.validateAndGetType(token);
-
-            model.addAttribute("token", token);
-            model.addAttribute("mode", type.name());
-
+            // ✅ فقط التحقق من صلاحية الـ token
+            setPasswordService.validateToken(token);
             return "set-password";
-
         } catch (Exception e) {
             return "token-invalid";
         }
