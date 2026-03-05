@@ -1,15 +1,14 @@
 package com.example.gestionpointage.service;
 
 import com.example.gestionpointage.entity.AccountToken;
-import com.example.gestionpointage.model.TokenType;
 import com.example.gestionpointage.model.Utilisateur;
 import com.example.gestionpointage.repository.AccountTokenRepository;
 import com.example.gestionpointage.repository.UtilisateurRepository;
 import com.example.gestionpointage.security.TokenHashUtil;
+import com.example.gestionpointage.security.PasswordPolicy;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
-import com.example.gestionpointage.security.PasswordPolicy;
 
 import java.time.LocalDateTime;
 
@@ -55,7 +54,6 @@ public class SetPasswordService {
 
         AccountToken accountToken = getValidToken(token);
 
-        // ✅ تحقق من الصلاحية هنا أيضاً
         if (accountToken.getExpiresAt().isBefore(LocalDateTime.now())) {
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
@@ -67,10 +65,11 @@ public class SetPasswordService {
 
         authCredentialsService.setPassword(user, password);
 
-        accountToken.setUsed(true);
-        accountTokenRepository.save(accountToken);
+        // ✅ حذف التوكن نهائياً بدل used=true
+        accountTokenRepository.delete(accountToken);
 
-        System.out.println("✅ Password set for user: " + user.getId());
+        System.out.println("✅ Password set & token deleted for user: "
+                + user.getId());
     }
 
     private AccountToken getValidToken(String token) {

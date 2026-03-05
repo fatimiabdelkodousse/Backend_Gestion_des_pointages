@@ -13,8 +13,6 @@ import org.springframework.web.server.ResponseStatusException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -78,30 +76,19 @@ public class ForgotPasswordService {
         System.out.println("✅ User found: " + user.getId()
                 + " - " + user.getNom() + " " + user.getPrenom());
 
-        // ══════════════════════════════════════════════════
-        // ✅ FIX 2: success() بعد التحقق من المستخدم
-        //    بدون هذا، كل طلب يُحسب كفشل ويُحظر بعد عدة محاولات
-        // ══════════════════════════════════════════════════
         protectionService.success(key);
 
         // ══════════════════════════════════════════════════
-        // 🧹 إبطال جميع التوكنات القديمة
-        //    (حذف Rate Limit المنفصل - LoginProtection يكفي)
+        // 🧹 حذف جميع التوكنات القديمة (بدل used=true)
         // ══════════════════════════════════════════════════
 
-        List<AccountToken> oldTokens =
-                tokenRepository.findByUtilisateurAndTypeAndUsedFalse(
-                        user,
-                        TokenType.RESET
-                );
-
-        for (AccountToken old : oldTokens) {
-            old.setUsed(true);
-            tokenRepository.save(old);
-        }
+        tokenRepository.deleteByUtilisateurAndTypeAndUsedFalse(
+                user,
+                TokenType.RESET
+        );
 
         // ══════════════════════════════════════════════════
-        // 🔑 إنشاء توكن جديد
+        // 🔑 إنشاء توكن جديد (URL-safe)
         // ══════════════════════════════════════════════════
 
         String token = SecureTokenGenerator.generate();
@@ -115,13 +102,11 @@ public class ForgotPasswordService {
         t.setUsed(false);
 
         tokenRepository.save(t);
-        
-        String encodedToken = URLEncoder.encode(token, StandardCharsets.UTF_8);
 
         String link = "https://gestion-pointages.up.railway.app/reset-password?token="
-                + encodedToken;
+                + token;
 
-        System.out.println("🔗 Reset link generated for: " + user.getEmail());
+        System.out.println("🔗 Link: " + link);
 
         try {
             emailService.sendResetLinkEmail(

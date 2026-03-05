@@ -2,6 +2,7 @@ package com.example.gestionpointage.service;
 
 import org.springframework.stereotype.Service;
 import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 
@@ -16,9 +17,17 @@ public class TokenCleanupService {
         this.repository = repository;
     }
 
-    @Scheduled(cron = "0 0 * * * *") // كل ساعة
-    public void cleanExpiredTokens() {
-        repository.deleteByExpiresAtBefore(LocalDateTime.now());
+    @Scheduled(fixedRate = 1800000)
+    @Transactional
+    public void cleanTokens() {
+
+        int expiredCount = repository.deleteAllExpired(LocalDateTime.now());
+        int usedCount    = repository.deleteAllUsed();
+
+        if (expiredCount > 0 || usedCount > 0) {
+            System.out.println("🧹 Token cleanup: "
+                    + expiredCount + " expired, "
+                    + usedCount + " used deleted");
+        }
     }
 }
-
