@@ -7,27 +7,44 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 
 import com.example.gestionpointage.repository.AccountTokenRepository;
+import com.example.gestionpointage.repository.RefreshTokenRepository;
 
 @Service
 public class TokenCleanupService {
 
-    private final AccountTokenRepository repository;
+    private final AccountTokenRepository accountTokenRepository;
+    private final RefreshTokenRepository refreshTokenRepository;
 
-    public TokenCleanupService(AccountTokenRepository repository) {
-        this.repository = repository;
+    public TokenCleanupService(
+            AccountTokenRepository accountTokenRepository,
+            RefreshTokenRepository refreshTokenRepository
+    ) {
+        this.accountTokenRepository = accountTokenRepository;
+        this.refreshTokenRepository = refreshTokenRepository;
     }
 
-    @Scheduled(fixedRate = 1800000)
+    @Scheduled(fixedRate = 1800000) // 30 min
     @Transactional
     public void cleanTokens() {
 
-        int expiredCount = repository.deleteAllExpired(LocalDateTime.now());
-        int usedCount    = repository.deleteAllUsed();
+        LocalDateTime now = LocalDateTime.now();
 
-        if (expiredCount > 0 || usedCount > 0) {
+        // ── Account tokens ──
+        int expiredAccount = accountTokenRepository.deleteAllExpired(now);
+        int usedAccount    = accountTokenRepository.deleteAllUsed();
+
+        // ── Refresh tokens ──
+        int revokedRefresh = refreshTokenRepository.deleteAllRevoked();
+        int expiredRefresh = refreshTokenRepository.deleteAllExpired(now);
+
+        int total = expiredAccount + usedAccount + revokedRefresh + expiredRefresh;
+
+        if (total > 0) {
             System.out.println("🧹 Token cleanup: "
-                    + expiredCount + " expired, "
-                    + usedCount + " used deleted");
+                    + expiredAccount + " expired account, "
+                    + usedAccount    + " used account, "
+                    + revokedRefresh + " revoked refresh, "
+                    + expiredRefresh + " expired refresh — deleted");
         }
     }
 }

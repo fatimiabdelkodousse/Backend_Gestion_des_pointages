@@ -12,6 +12,7 @@ import com.example.gestionpointage.entity.RefreshToken;
 import com.example.gestionpointage.model.Utilisateur;
 import com.example.gestionpointage.repository.RefreshTokenRepository;
 import com.example.gestionpointage.model.Role;
+
 import java.util.List;
 
 @Service
@@ -29,6 +30,10 @@ public class RefreshTokenService {
         this.jwtService = jwtService;
     }
 
+    // ══════════════════════════════════════════════
+    // 🔄 ROTATE (refresh access + refresh tokens)
+    // ══════════════════════════════════════════════
+
     public RefreshTokenResponseDTO rotate(
             String rawToken,
             String ip,
@@ -37,22 +42,24 @@ public class RefreshTokenService {
         // 1️⃣ Hash incoming token
         String hash = TokenHashUtil.hash(rawToken);
 
+        // ✅ البحث بدون فلترة revoked → لكشف إعادة الاستخدام
         RefreshToken storedToken = refreshTokenRepository
-                .findByTokenHashAndRevokedFalse(hash)
+                .findByTokenHash(hash)
                 .orElseThrow(() ->
                         new ResponseStatusException(HttpStatus.UNAUTHORIZED)
                 );
 
-        // 2️⃣ Expired
-        if (storedToken.getExpiresAt().isBefore(LocalDateTime.now())) {
-            storedToken.setRevoked(true);
-            refreshTokenRepository.save(storedToken);
+        // 2️⃣ 🚨 Reuse attack detection
+        //    إذا التوكن مُلغى = شخص سرقه وأعاد استخدامه
+        if (storedToken.isRevoked()) {
+            revokeAllUserTokens(storedToken.getUser());
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
         }
 
-        // 3️⃣ Reuse attack detection
-        if (storedToken.isRevoked()) {
-            revokeAllUserTokens(storedToken.getUser());
+        // 3️⃣ Expired
+        if (storedToken.getExpiresAt().isBefore(LocalDateTime.now())) {
+            storedToken.setRevoked(true);
+            refreshTokenRepository.save(storedToken);
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
         }
 
@@ -88,37 +95,15 @@ public class RefreshTokenService {
         );
     }
 
-    private void revokeAllUserTokens(Utilisateur user) {
-        refreshTokenRepository.revokeAllByUser(user);
-    }
-    
-    public void logout(String rawRefreshToken) {
+    // ══════════════════════════════════════════════
+    // 🔐 CREATE (on login — one per device)
+    // ══════════════════════════════════════════════
 
-        String hash = TokenHashUtil.hash(rawRefreshToken);
-
-        RefreshToken token = refreshTokenRepository
-                .findByTokenHashAndRevokedFalse(hash)
-                .orElseThrow(() ->
-                    new ResponseStatusException(HttpStatus.UNAUTHORIZED)
-                );
-
-        token.setRevoked(true);
-        refreshTokenRepository.save(token);
-    }
-    
-    public void logoutAll(Utilisateur user) {
-        refreshTokenRepository.revokeAllByUser(user);
-    }
-
-    public void logoutAllEmployees(List<Long> userIds) {
-        refreshTokenRepository.revokeAllByUserIdsAndRole(userIds, Role.EMPLOYE);
-    }
-
-    public void logoutAllEmployees() {
-        refreshTokenRepository.revokeAllByRole(Role.EMPLOYE);
-    }
-    
     public String createRefreshToken(Utilisateur user, String ip, String userAgent) {
+
+        // 🧹 حذف جميع التوكنز السابقة لنفس الجهاز (user + userAgent)
+        //    هذا يضمن توكن واحد فقط لكل جهاز
+        refreshTokenRepository.deleteAllByUserAndUserAgent(user, userAgent);
 
         String rawToken = SecureTokenGenerator.generate();
         String hash = TokenHashUtil.hash(rawToken);
@@ -136,4 +121,39 @@ public class RefreshTokenService {
         return rawToken;
     }
 
+    // ══════════════════════════════════════════════
+    // 🚪 LOGOUT
+    // ══════════════════════════════════════════════
+
+    public void logout(String rawRefreshToken) {
+
+        String hash = TokenHashUtil.hash(rawRefreshToken);
+
+        RefreshToken token = refreshTokenRepository
+                .findByTokenHashAndRevokedFalse(hash)
+                .orElseThrow(() ->
+                        new ResponseStatusException(HttpStatus.UNAUTHORIZED)
+                );
+
+        token.setRevoked(true);
+        refreshTokenRepository.save(token);
+    }
+
+    public void logoutAll(Utilisateur user) {
+        refreshTokenRepository.revokeAllByUser(user);
+    }
+
+    public void logoutAllEmployees(List<Long> userIds) {
+        refreshTokenRepository.revokeAllByUserIdsAndRole(userIds, Role.EMPLOYE);
+    }
+
+    public void logoutAllEmployees() {
+        refreshTokenRepository.revokeAllByRole(Role.EMPLOYE);
+    }
+
+    // ══════════════════════════════════════════════
+
+    private void revokeAllUserTokens(Utilisateur user) {
+        refreshTokenRepository.revokeAllByUser(user);
+    }
 }
