@@ -14,13 +14,9 @@ import java.util.List;
 
 public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Long> {
 
-    // ── للـ rotate: البحث بدون فلترة revoked (لكشف إعادة الاستخدام) ──
     Optional<RefreshToken> findByTokenHash(String tokenHash);
 
-    // ── للـ logout: فقط التوكنز النشطة ──
-    Optional<RefreshToken> findByTokenHashAndRevokedFalse(String tokenHash);
-
-    // ── حذف كل توكنز الجهاز نفسه عند Login جديد ──
+    // ── Login: حذف كل توكنز الجهاز السابقة ──
     @Modifying
     @Query("DELETE FROM RefreshToken t WHERE t.user = :user AND t.userAgent = :userAgent")
     void deleteAllByUserAndUserAgent(
@@ -28,26 +24,24 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Long
             @Param("userAgent") String userAgent
     );
 
-    // ── إلغاء كل توكنز المستخدم ──
+    // ── Logout All: حذف كل توكنز المستخدم ──
     @Modifying
-    @Query("UPDATE RefreshToken t SET t.revoked = true WHERE t.user = :user")
-    void revokeAllByUser(@Param("user") Utilisateur user);
+    @Query("DELETE FROM RefreshToken t WHERE t.user = :user")
+    void deleteAllByUser(@Param("user") Utilisateur user);
+
+    // ── Admin: حذف كل توكنز الموظفين ──
+    @Modifying
+    @Query("DELETE FROM RefreshToken t WHERE t.user.role = :role")
+    void deleteAllByRole(@Param("role") Role role);
 
     @Modifying
-    @Query("UPDATE RefreshToken t SET t.revoked = true WHERE t.user.role = :role")
-    void revokeAllByRole(@Param("role") Role role);
-
-    @Modifying
-    @Query("UPDATE RefreshToken t SET t.revoked = true WHERE t.user.id IN :userIds AND t.user.role = :role")
-    void revokeAllByUserIdsAndRole(
+    @Query("DELETE FROM RefreshToken t WHERE t.user.id IN :userIds AND t.user.role = :role")
+    void deleteAllByUserIdsAndRole(
             @Param("userIds") List<Long> userIds,
             @Param("role") Role role
     );
 
-    @Modifying
-    @Query("DELETE FROM RefreshToken t WHERE t.revoked = true")
-    int deleteAllRevoked();
-
+    // ── Cleanup: حذف المنتهية فقط ──
     @Modifying
     @Query("DELETE FROM RefreshToken t WHERE t.expiresAt < :now")
     int deleteAllExpired(@Param("now") LocalDateTime now);

@@ -1,12 +1,26 @@
 package com.example.gestionpointage.security;
 
-import org.apache.commons.codec.digest.DigestUtils;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.util.HexFormat;
 
 public class DeviceFingerprintUtil {
 
-    public static String generate(String ip, String userAgent) {
-        
-        String raw = userAgent != null ? userAgent : "unknown";
-        return DigestUtils.sha256Hex(raw);
+    public static String generate(String userAgent) {
+
+        String raw = normalize(userAgent);
+
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(raw.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(hash);
+        } catch (Exception e) {
+            throw new RuntimeException("Hash error", e);
+        }
+    }
+
+    private static String normalize(String value) {
+        if (value == null) return "unknown";
+        return value.trim().toLowerCase();
     }
 }

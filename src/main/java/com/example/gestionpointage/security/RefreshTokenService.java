@@ -31,7 +31,7 @@ public class RefreshTokenService {
     }
 
     // ══════════════════════════════════════════════
-    // 🔄 ROTATE (refresh access + refresh tokens)
+    // 🔄 ROTATE
     // ══════════════════════════════════════════════
 
     public RefreshTokenResponseDTO rotate(
@@ -39,43 +39,33 @@ public class RefreshTokenService {
             String ip,
             String userAgent
     ) {
-        // 1️⃣ Hash incoming token
         String hash = TokenHashUtil.hash(rawToken);
 
-        // ✅ البحث بدون فلترة revoked → لكشف إعادة الاستخدام
+        // 1️⃣ البحث عن التوكن
         RefreshToken storedToken = refreshTokenRepository
                 .findByTokenHash(hash)
                 .orElseThrow(() ->
                         new ResponseStatusException(HttpStatus.UNAUTHORIZED)
                 );
 
-        // 2️⃣ 🚨 Reuse attack detection
-        //    إذا التوكن مُلغى = شخص سرقه وأعاد استخدامه
-        if (storedToken.isRevoked()) {
-            revokeAllUserTokens(storedToken.getUser());
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
-        }
-
-        // 3️⃣ Expired
+        // 2️⃣ التحقق من الصلاحية
         if (storedToken.getExpiresAt().isBefore(LocalDateTime.now())) {
-            storedToken.setRevoked(true);
-            refreshTokenRepository.save(storedToken);
+            refreshTokenRepository.delete(storedToken);
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
         }
-
-        // 4️⃣ Revoke old token
-        storedToken.setRevoked(true);
-        refreshTokenRepository.save(storedToken);
 
         Utilisateur user = storedToken.getUser();
 
-        // 5️⃣ New access token (JWT)
+        // 3️⃣ حذف التوكن القديم (بدل revoke)
+        refreshTokenRepository.delete(storedToken);
+
+        // 4️⃣ Access token جديد
         String newAccessToken = jwtService.generateAccessToken(
                 user.getId().toString(),
                 user.getRole().name()
         );
 
-        // 6️⃣ New refresh token (opaque)
+        // 5️⃣ Refresh token جديد
         String newRawRefreshToken = SecureTokenGenerator.generate();
         String newHash = TokenHashUtil.hash(newRawRefreshToken);
 
@@ -99,10 +89,12 @@ public class RefreshTokenService {
     // 🔐 CREATE (on login — one per device)
     // ══════════════════════════════════════════════
 
-    public String createRefreshToken(Utilisateur user, String ip, String userAgent) {
-
-        // 🧹 حذف جميع التوكنز السابقة لنفس الجهاز (user + userAgent)
-        //    هذا يضمن توكن واحد فقط لكل جهاز
+    public String createRefreshToken(
+            Utilisateur user,
+            String ip,
+            String userAgent
+    ) {
+        // حذف كل التوكنز السابقة لنفس الجهاز
         refreshTokenRepository.deleteAllByUserAndUserAgent(user, userAgent);
 
         String rawToken = SecureTokenGenerator.generate();
@@ -126,34 +118,22 @@ public class RefreshTokenService {
     // ══════════════════════════════════════════════
 
     public void logout(String rawRefreshToken) {
-
         String hash = TokenHashUtil.hash(rawRefreshToken);
 
-        RefreshToken token = refreshTokenRepository
-                .findByTokenHashAndRevokedFalse(hash)
-                .orElseThrow(() ->
-                        new ResponseStatusException(HttpStatus.UNAUTHORIZED)
-                );
-
-        token.setRevoked(true);
-        refreshTokenRepository.save(token);
+        // حذف التوكن — إذا غير موجود، لا مشكلة
+        refreshTokenRepository.findByTokenHash(hash)
+                .ifPresent(refreshTokenRepository::delete);
     }
 
     public void logoutAll(Utilisateur user) {
-        refreshTokenRepository.revokeAllByUser(user);
+        refreshTokenRepository.deleteAllByUser(user);
     }
 
     public void logoutAllEmployees(List<Long> userIds) {
-        refreshTokenRepository.revokeAllByUserIdsAndRole(userIds, Role.EMPLOYE);
+        refreshTokenRepository.deleteAllByUserIdsAndRole(userIds, Role.EMPLOYE);
     }
 
     public void logoutAllEmployees() {
-        refreshTokenRepository.revokeAllByRole(Role.EMPLOYE);
-    }
-
-    // ══════════════════════════════════════════════
-
-    private void revokeAllUserTokens(Utilisateur user) {
-        refreshTokenRepository.revokeAllByUser(user);
+        refreshTokenRepository.deleteAllByRole(Role.EMPLOYE);
     }
 }

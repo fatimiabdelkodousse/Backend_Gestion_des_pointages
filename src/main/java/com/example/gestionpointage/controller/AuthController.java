@@ -114,12 +114,8 @@ public class AuthController {
 
         loginProtectionService.success(key);
 
-        // ==========================================
-        // 🔐 Suspicious Login Detection
-        // ==========================================
-
-        String deviceHash =
-                DeviceFingerprintUtil.generate(ip, userAgent);
+        
+        String deviceHash = DeviceFingerprintUtil.generate(userAgent);
 
         Optional<UserDevice> deviceOpt =
                 userDeviceRepository.findByUserAndDeviceHash(
@@ -150,6 +146,7 @@ public class AuthController {
 
             UserDevice device = deviceOpt.get();
             device.setLastSeen(LocalDateTime.now());
+            device.setIpAddress(ip);  // ✅ تحديث IP الحالي
             userDeviceRepository.save(device);
         }
 
@@ -180,7 +177,6 @@ public class AuthController {
                 refreshToken
         );
     }
-
     @PostMapping("/forgot-password")
     public ResponseEntity<?> forgotPassword(
             @RequestBody ForgotPasswordRequestDTO dto,
