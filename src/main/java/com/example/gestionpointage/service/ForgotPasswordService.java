@@ -118,7 +118,7 @@ public class ForgotPasswordService {
         
         String encodedToken = URLEncoder.encode(token, StandardCharsets.UTF_8);
 
-        String link = "https://gestion-pointage.up.railway.app/reset-password?token="
+        String link = "https://gestion-pointages.up.railway.app/reset-password?token="
                 + encodedToken;
 
         System.out.println("🔗 Reset link generated for: " + user.getEmail());
