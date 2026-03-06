@@ -65,7 +65,6 @@ public class SetPasswordService {
 
         authCredentialsService.setPassword(user, password);
 
-        // ✅ حذف التوكن نهائياً بدل used=true
         accountTokenRepository.delete(accountToken);
 
         System.out.println("✅ Password set & token deleted for user: "
