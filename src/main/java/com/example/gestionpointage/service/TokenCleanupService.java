@@ -23,26 +23,14 @@ public class TokenCleanupService {
         this.refreshTokenRepository = refreshTokenRepository;
     }
 
-    @Scheduled(fixedRate = 3600000) // ساعة واحدة
+    @Scheduled(fixedRate = 3600000)
     @Transactional
     public void cleanTokens() {
 
         LocalDateTime now = LocalDateTime.now();
 
-        // ── Account tokens ──
-        int expiredAccount = accountTokenRepository.deleteAllExpired(now);
-        int usedAccount    = accountTokenRepository.deleteAllUsed();
-
-        // ── Refresh tokens: فقط المنتهية ──
-        int expiredRefresh = refreshTokenRepository.deleteAllExpired(now);
-
-        int total = expiredAccount + usedAccount + expiredRefresh;
-
-        if (total > 0) {
-            System.out.println("🧹 Token cleanup: "
-                    + expiredAccount + " expired account, "
-                    + usedAccount    + " used account, "
-                    + expiredRefresh + " expired refresh — deleted");
-        }
+        accountTokenRepository.deleteAllExpired(now);
+        accountTokenRepository.deleteAllUsed();
+        refreshTokenRepository.deleteAllExpired(now);
     }
 }

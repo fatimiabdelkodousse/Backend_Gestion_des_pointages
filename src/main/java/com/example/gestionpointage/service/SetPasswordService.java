@@ -31,21 +31,14 @@ public class SetPasswordService {
 
     public void validateToken(String token) {
 
-        System.out.println("🔍 Validating token hash...");
-
         AccountToken accountToken = getValidToken(token);
 
         if (accountToken.getExpiresAt().isBefore(LocalDateTime.now())) {
-            System.out.println("❌ Token expired at: "
-                    + accountToken.getExpiresAt());
             throw new ResponseStatusException(
                     HttpStatus.BAD_REQUEST,
                     "Token expired"
             );
         }
-
-        System.out.println("✅ Token is valid, expires at: "
-                + accountToken.getExpiresAt());
     }
 
     public void activateAccount(String token, String password) {
@@ -66,26 +59,19 @@ public class SetPasswordService {
         authCredentialsService.setPassword(user, password);
 
         accountTokenRepository.delete(accountToken);
-
-        System.out.println("✅ Password set & token deleted for user: "
-                + user.getId());
     }
 
     private AccountToken getValidToken(String token) {
 
         String tokenHash = TokenHashUtil.hash(token);
 
-        System.out.println("🔍 Looking for token hash: "
-                + tokenHash.substring(0, 8) + "...");
-
         return accountTokenRepository
                 .findByTokenHashAndUsedFalse(tokenHash)
-                .orElseThrow(() -> {
-                    System.out.println("❌ Token not found or already used");
-                    return new ResponseStatusException(
-                            HttpStatus.BAD_REQUEST,
-                            "Invalid token"
-                    );
-                });
+                .orElseThrow(() ->
+                        new ResponseStatusException(
+                                HttpStatus.BAD_REQUEST,
+                                "Invalid token"
+                        )
+                );
     }
 }

@@ -51,12 +51,6 @@ public class ForgotPasswordService {
                 ? null
                 : badgeUid.trim();
 
-        System.out.println("🔍 Forgot password request:");
-        System.out.println("   email: " + email);
-        System.out.println("   nom: " + nom);
-        System.out.println("   prenom: " + prenom);
-        System.out.println("   badgeUid: " + normalizedBadgeUid);
-
         Utilisateur user = utilisateurRepository
                 .findActiveUserForPasswordReset(
                         email.trim(),
@@ -64,31 +58,19 @@ public class ForgotPasswordService {
                         prenom.trim(),
                         normalizedBadgeUid
                 )
-                .orElseThrow(() -> {
-                    System.out.println("❌ User not found for password reset");
-                    return new ResponseStatusException(
-                            HttpStatus.BAD_REQUEST,
-                            "Informations incorrectes"
-                    );
-                });
-
-        System.out.println("✅ User found: " + user.getId()
-                + " - " + user.getNom() + " " + user.getPrenom());
+                .orElseThrow(() ->
+                        new ResponseStatusException(
+                                HttpStatus.BAD_REQUEST,
+                                "Informations incorrectes"
+                        )
+                );
 
         protectionService.success(key);
-
-        // ══════════════════════════════════════════════════
-        // 🧹 حذف جميع التوكنات القديمة (بدل used=true)
-        // ══════════════════════════════════════════════════
 
         tokenRepository.deleteByUtilisateurAndTypeAndUsedFalse(
                 user,
                 TokenType.RESET
         );
-
-        // ══════════════════════════════════════════════════
-        // 🔑 إنشاء توكن جديد (URL-safe)
-        // ══════════════════════════════════════════════════
 
         String token = SecureTokenGenerator.generate();
         String hash  = TokenHashUtil.hash(token);
@@ -105,19 +87,11 @@ public class ForgotPasswordService {
         String link = "https://gestion-pointages.up.railway.app/reset-password?token="
                 + token;
 
-        System.out.println("🔗 Link: " + link);
-
-        try {
-            emailService.sendResetLinkEmail(
-                    user.getEmail(),
-                    user.getPrenom(),
-                    user.getNom(),
-                    link
-            );
-            System.out.println("✅ Email queued for: " + user.getEmail());
-        } catch (Exception e) {
-            System.out.println("❌ Email sending failed: " + e.getMessage());
-            e.printStackTrace();
-        }
+        emailService.sendResetLinkEmail(
+                user.getEmail(),
+                user.getPrenom(),
+                user.getNom(),
+                link
+        );
     }
 }
