@@ -20,15 +20,9 @@ import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import com.example.gestionpointage.dto.DailyReportRowDTO;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 @RestController
 @RequestMapping("/reports")
 public class ReportsController {
-
-    private static final Logger log =
-            LoggerFactory.getLogger(ReportsController.class);
 
     private static final String XLSX_CONTENT_TYPE =
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
@@ -40,7 +34,7 @@ public class ReportsController {
     }
 
     // ═══════════════════════════════════════════════════
-    //  JSON ENDPOINTS (unchanged)
+    //  JSON ENDPOINTS
     // ═══════════════════════════════════════════════════
 
     @GetMapping("/daily")
@@ -69,7 +63,7 @@ public class ReportsController {
     }
 
     // ═══════════════════════════════════════════════════
-    //  ✅ EXPORT DAILY
+    //  EXPORT DAILY
     // ═══════════════════════════════════════════════════
 
     @GetMapping(
@@ -80,13 +74,9 @@ public class ReportsController {
             @RequestParam Long siteId,
             @RequestParam String date) {
 
-        log.info("📊 Export daily — site={}, date={}", siteId, date);
-
         try {
             var rows = pointageService.generateDailyReport(
                     siteId, LocalDate.parse(date));
-
-            log.info("✅ Daily report: {} rows", rows.size());
 
             try (Workbook workbook = new XSSFWorkbook()) {
                 Sheet sheet = workbook.createSheet("Daily Report");
@@ -102,22 +92,16 @@ public class ReportsController {
                 int rowIndex = 1;
                 for (var r : rows) {
                     Row row = sheet.createRow(rowIndex++);
-                    row.createCell(0).setCellValue(
-                            safeStr(r.getNom()));
-                    row.createCell(1).setCellValue(
-                            safeStr(r.getPrenom()));
+                    row.createCell(0).setCellValue(safeStr(r.getNom()));
+                    row.createCell(1).setCellValue(safeStr(r.getPrenom()));
                     row.createCell(2).setCellValue(
                             r.getHeureEntree() != null
-                                    ? r.getHeureEntree().toString()
-                                    : "");
+                                    ? r.getHeureEntree().toString() : "");
                     row.createCell(3).setCellValue(
                             r.getHeureSortie() != null
-                                    ? r.getHeureSortie().toString()
-                                    : "");
-                    row.createCell(4).setCellValue(
-                            r.getTotalMinutes());
-                    row.createCell(5).setCellValue(
-                            safeStr(r.getStatut()));
+                                    ? r.getHeureSortie().toString() : "");
+                    row.createCell(4).setCellValue(r.getTotalMinutes());
+                    row.createCell(5).setCellValue(safeStr(r.getStatut()));
                 }
 
                 setColumnWidths(sheet, 6);
@@ -125,15 +109,13 @@ public class ReportsController {
             }
 
         } catch (Exception e) {
-            log.error("❌ Export daily failed — site={}, date={}",
-                    siteId, date, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(errorBytes(e));
         }
     }
 
     // ═══════════════════════════════════════════════════
-    //  ✅ EXPORT WEEKLY
+    //  EXPORT WEEKLY
     // ═══════════════════════════════════════════════════
 
     @GetMapping(
@@ -144,13 +126,9 @@ public class ReportsController {
             @RequestParam Long siteId,
             @RequestParam String date) {
 
-        log.info("📊 Export weekly — site={}, date={}", siteId, date);
-
         try {
             var rows = pointageService.generateWeeklyReport(
                     siteId, LocalDate.parse(date));
-
-            log.info("✅ Weekly report: {} rows", rows.size());
 
             try (Workbook workbook = new XSSFWorkbook()) {
                 Sheet sheet = workbook.createSheet("Weekly Report");
@@ -166,18 +144,12 @@ public class ReportsController {
                 int rowIndex = 1;
                 for (var r : rows) {
                     Row row = sheet.createRow(rowIndex++);
-                    row.createCell(0).setCellValue(
-                            safeStr(r.getNom()));
-                    row.createCell(1).setCellValue(
-                            safeStr(r.getPrenom()));
-                    row.createCell(2).setCellValue(
-                            r.getJoursPresence());
-                    row.createCell(3).setCellValue(
-                            r.getJoursAbsence());
-                    row.createCell(4).setCellValue(
-                            r.getRetards());
-                    row.createCell(5).setCellValue(
-                            r.getTotalMinutes());
+                    row.createCell(0).setCellValue(safeStr(r.getNom()));
+                    row.createCell(1).setCellValue(safeStr(r.getPrenom()));
+                    row.createCell(2).setCellValue(r.getJoursPresence());
+                    row.createCell(3).setCellValue(r.getJoursAbsence());
+                    row.createCell(4).setCellValue(r.getRetards());
+                    row.createCell(5).setCellValue(r.getTotalMinutes());
                 }
 
                 setColumnWidths(sheet, 6);
@@ -185,15 +157,13 @@ public class ReportsController {
             }
 
         } catch (Exception e) {
-            log.error("❌ Export weekly failed — site={}, date={}",
-                    siteId, date, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(errorBytes(e));
         }
     }
 
     // ═══════════════════════════════════════════════════
-    //  ✅ EXPORT MONTHLY
+    //  EXPORT MONTHLY
     // ═══════════════════════════════════════════════════
 
     @GetMapping(
@@ -205,14 +175,9 @@ public class ReportsController {
             @RequestParam int year,
             @RequestParam int month) {
 
-        log.info("📊 Export monthly — site={}, {}-{}",
-                siteId, year, month);
-
         try {
             var rows = pointageService.generateMonthlyReport(
                     siteId, year, month);
-
-            log.info("✅ Monthly report: {} rows", rows.size());
 
             try (Workbook workbook = new XSSFWorkbook()) {
                 Sheet sheet = workbook.createSheet("Monthly Report");
@@ -228,18 +193,12 @@ public class ReportsController {
                 int rowIndex = 1;
                 for (var r : rows) {
                     Row row = sheet.createRow(rowIndex++);
-                    row.createCell(0).setCellValue(
-                            safeStr(r.getNom()));
-                    row.createCell(1).setCellValue(
-                            safeStr(r.getPrenom()));
-                    row.createCell(2).setCellValue(
-                            r.getTotalJoursTravail());
-                    row.createCell(3).setCellValue(
-                            r.getTauxPresence());
-                    row.createCell(4).setCellValue(
-                            r.getAbsences());
-                    row.createCell(5).setCellValue(
-                            r.getTotalMinutes());
+                    row.createCell(0).setCellValue(safeStr(r.getNom()));
+                    row.createCell(1).setCellValue(safeStr(r.getPrenom()));
+                    row.createCell(2).setCellValue(r.getTotalJoursTravail());
+                    row.createCell(3).setCellValue(r.getTauxPresence());
+                    row.createCell(4).setCellValue(r.getAbsences());
+                    row.createCell(5).setCellValue(r.getTotalMinutes());
                 }
 
                 setColumnWidths(sheet, 6);
@@ -247,8 +206,6 @@ public class ReportsController {
             }
 
         } catch (Exception e) {
-            log.error("❌ Export monthly failed — site={}, {}-{}",
-                    siteId, year, month, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(errorBytes(e));
         }
@@ -264,9 +221,7 @@ public class ReportsController {
 
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         workbook.write(out);
-
         byte[] bytes = out.toByteArray();
-        log.info("📦 Excel generated: {} bytes — {}", bytes.length, filename);
 
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION,
