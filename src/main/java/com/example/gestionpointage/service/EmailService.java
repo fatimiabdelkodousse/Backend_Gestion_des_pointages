@@ -5,6 +5,7 @@ import com.sendgrid.helpers.mail.Mail;
 import com.sendgrid.helpers.mail.objects.Content;
 import com.sendgrid.helpers.mail.objects.Email;
 
+import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
@@ -21,49 +22,41 @@ public class EmailService {
     private String fromEmail;
 
     // ═══════════════════════════════════════════
-    // ✅ SEND (مُصحّح مع logs)
+    // ✅ Singleton SendGrid client
+    // ═══════════════════════════════════════════
+
+    private SendGrid sendGridClient;
+
+    @PostConstruct
+    private void init() {
+        this.sendGridClient = new SendGrid(sendGridApiKey);
+    }
+
+    // ═══════════════════════════════════════════
+    // SEND
     // ═══════════════════════════════════════════
 
     private void send(String to, String subject, String htmlBody) {
         try {
-            System.out.println("📧 Sending email to: " + to);
-            System.out.println("📧 Subject: " + subject);
-            System.out.println("📧 From: " + fromEmail);
-
             Email from = new Email(fromEmail, "Gestion Pointage");
             Email toEmail = new Email(to);
             Content content = new Content("text/html", htmlBody);
             Mail mail = new Mail(from, subject, toEmail, content);
 
-            SendGrid sg = new SendGrid(sendGridApiKey);
             Request request = new Request();
-
             request.setMethod(Method.POST);
             request.setEndpoint("mail/send");
             request.setBody(mail.build());
 
-            // ✅ التحقق من الاستجابة
-            Response response = sg.api(request);
-
-            System.out.println("📧 SendGrid status: " + response.getStatusCode());
-            System.out.println("📧 SendGrid body: " + response.getBody());
-
-            if (response.getStatusCode() >= 400) {
-                System.out.println("❌ SendGrid error headers: "
-                        + response.getHeaders());
-            } else {
-                System.out.println("✅ Email sent successfully to: " + to);
-            }
+            sendGridClient.api(request);
 
         } catch (IOException e) {
-            System.out.println("❌ Email sending FAILED: " + e.getMessage());
-            e.printStackTrace();
-            // ✅ لا نرمي Exception حتى لا يتوقف الـ Async
+            // Silent fail — don't crash the async thread
         }
     }
 
     // ═══════════════════════════════════════════
-    // ✅ RESET LINK
+    // RESET LINK
     // ═══════════════════════════════════════════
 
     @Async("taskExecutor")
@@ -71,9 +64,7 @@ public class EmailService {
             String to,
             String prenom,
             String nom,
-            String link
-    ) {
-        System.out.println("🔄 Async: sendResetLinkEmail started for: " + to);
+            String link) {
 
         String html = buildActionEmail(
                 prenom + " " + nom,
@@ -83,8 +74,7 @@ public class EmailService {
                 link,
                 "Réinitialiser le mot de passe",
                 "#6C63FF",
-                "Ce lien expire dans 15 minutes."  // ✅ 15 بدل 5
-        );
+                "Ce lien expire dans 15 minutes.");
 
         send(to, "Réinitialisation du mot de passe", html);
     }
@@ -97,9 +87,7 @@ public class EmailService {
     public void sendSuspiciousLoginAlert(
             String email,
             String ip,
-            String userAgent
-    ) {
-        System.out.println("🔄 Async: sendSuspiciousLoginAlert for: " + email);
+            String userAgent) {
 
         String html = buildAlertEmail(ip, userAgent);
         send(email, "Connexion suspecte détectée", html);
@@ -115,8 +103,8 @@ public class EmailService {
             String link,
             String buttonText,
             String buttonColor,
-            String footer
-    ) {
+            String footer) {
+
         return "<!DOCTYPE html>"
                 + "<html><head><meta charset=\"UTF-8\">"
                 + "<meta name=\"viewport\""
