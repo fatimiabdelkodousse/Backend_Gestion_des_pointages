@@ -1,5 +1,7 @@
 package com.example.gestionpointage.dto;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 public class MonthlyReportDTO {
 
     private Long userId;
@@ -8,7 +10,7 @@ public class MonthlyReportDTO {
 
     private long totalJoursTravail;
     private long totalMinutes;
-    private String totalHeuresTravail;   
+    private String totalHeuresTravail;
     private double tauxPresence;
     private long absences;
 
@@ -26,7 +28,7 @@ public class MonthlyReportDTO {
         this.prenom = prenom;
         this.totalJoursTravail = totalJoursTravail;
         this.totalMinutes = totalMinutes;
-        this.totalHeuresTravail = formatMinutes(totalMinutes);  
+        this.totalHeuresTravail = formatMinutes(totalMinutes);
         this.tauxPresence = tauxPresence;
         this.absences = absences;
     }
@@ -41,8 +43,11 @@ public class MonthlyReportDTO {
     public String getNom() { return nom; }
     public String getPrenom() { return prenom; }
     public long getTotalJoursTravail() { return totalJoursTravail; }
+
+    @JsonIgnore
     public long getTotalMinutes() { return totalMinutes; }
-    public String getTotalHeuresTravail() { return totalHeuresTravail; }  
+
+    public String getTotalHeuresTravail() { return totalHeuresTravail; }
     public double getTauxPresence() { return tauxPresence; }
     public long getAbsences() { return absences; }
 }

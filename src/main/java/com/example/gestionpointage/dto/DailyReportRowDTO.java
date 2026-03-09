@@ -1,6 +1,7 @@
 package com.example.gestionpointage.dto;
 
 import java.time.LocalTime;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 public class DailyReportRowDTO {
 
@@ -12,7 +13,7 @@ public class DailyReportRowDTO {
     private LocalTime heureSortie;
 
     private long totalMinutes;
-    private String totalHeuresTravail;   
+    private String totalHeuresTravail;
     private String statut;
 
     public DailyReportRowDTO(
@@ -30,7 +31,7 @@ public class DailyReportRowDTO {
         this.heureEntree = heureEntree;
         this.heureSortie = heureSortie;
         this.totalMinutes = totalMinutes;
-        this.totalHeuresTravail = formatMinutes(totalMinutes);  
+        this.totalHeuresTravail = formatMinutes(totalMinutes);
         this.statut = statut;
     }
 
@@ -45,7 +46,10 @@ public class DailyReportRowDTO {
     public String getPrenom() { return prenom; }
     public LocalTime getHeureEntree() { return heureEntree; }
     public LocalTime getHeureSortie() { return heureSortie; }
+
+    @JsonIgnore
     public long getTotalMinutes() { return totalMinutes; }
-    public String getTotalHeuresTravail() { return totalHeuresTravail; }  
+
+    public String getTotalHeuresTravail() { return totalHeuresTravail; }
     public String getStatut() { return statut; }
 }

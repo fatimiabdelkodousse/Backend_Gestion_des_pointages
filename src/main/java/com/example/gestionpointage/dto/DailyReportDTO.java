@@ -1,6 +1,7 @@
 package com.example.gestionpointage.dto;
 
 import java.time.LocalDate;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 public class DailyReportDTO {
 
@@ -22,7 +23,10 @@ public class DailyReportDTO {
     }
 
     public LocalDate getDate() { return date; }
+
+    @JsonIgnore
     public long getTotalMinutes() { return totalMinutes; }
+
     public long getTotalHours() { return totalHours; }
     public long getRemainingMinutes() { return remainingMinutes; }
     public String getFormattedDuration() { return formattedDuration; }
