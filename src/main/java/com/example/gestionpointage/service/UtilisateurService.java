@@ -16,7 +16,7 @@ import java.time.LocalTime;
 @Transactional
 public class UtilisateurService {
 
-    private static final LocalTime ELIGIBILITY_CUTOFF = LocalTime.of(6, 0);
+    private static final LocalTime ELIGIBILITY_CUTOFF = LocalTime.of(9, 0);
 
     private final UtilisateurRepository utilisateurRepository;
     private final SiteRepository siteRepository;
@@ -29,11 +29,6 @@ public class UtilisateurService {
         this.siteRepository = siteRepository;
     }
 
-    /**
-     * حساب eligibleFrom حسب الوقت الحالي:
-     *   قبل 06:00 → اليوم
-     *   بعد 06:00 → الغد
-     */
     private LocalDate computeEligibleFrom() {
         return LocalTime.now().isBefore(ELIGIBILITY_CUTOFF)
                 ? LocalDate.now()
