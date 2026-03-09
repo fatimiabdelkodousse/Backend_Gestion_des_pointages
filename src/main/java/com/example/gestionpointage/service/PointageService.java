@@ -39,6 +39,9 @@ import com.example.gestionpointage.model.Role;
 @Transactional
 public class PointageService {
 
+    // ✅ ساعة نهاية العمل — بعدها يُحتسب الغياب
+    private static final LocalTime WORK_END = LocalTime.of(18, 0);
+
     private final PointageRepository pointageRepository;
     private final UtilisateurRepository utilisateurRepository;
     private final BadgeRepository badgeRepository;
@@ -106,6 +109,14 @@ public class PointageService {
                         );
 
         if (firstEntryOpt.isEmpty()) {
+            // ══════════════════════════════════════════════════════
+            // ✅ اليوم + قبل 18:00 → NOT_YET (لم يسجّل بعد)
+            //    أي تاريخ آخر أو بعد 18:00 → ABSENT (غائب مؤكد)
+            // ══════════════════════════════════════════════════════
+            if (date.equals(LocalDate.now())
+                    && LocalTime.now().isBefore(WORK_END)) {
+                return AttendanceStatus.NOT_YET;
+            }
             return AttendanceStatus.ABSENT;
         }
 
@@ -195,9 +206,6 @@ public class PointageService {
             );
         }
 
-        // ══════════════════════════════════════════════════
-        // استنتاج النوع من آخر pointage في نفس اليوم فقط
-        // ══════════════════════════════════════════════════
         LocalDate pointageDate = timestamp.toLocalDate();
         LocalDateTime dayStart = startOfDay(pointageDate);
         LocalDateTime dayEnd   = endOfDay(pointageDate);
@@ -291,7 +299,6 @@ public class PointageService {
             LocalDate date
     ) {
 
-        // ═══ ✅ فقط الموظفين المؤهلين لهذا التاريخ ═══
         List<Utilisateur> users = getEligibleEmployees(siteId, date);
 
         long total  = users.size();
@@ -299,6 +306,7 @@ public class PointageService {
         long onTime = 0;
         long late   = 0;
         long absent = 0;
+        long notYet = 0;    // ✅ جديد
 
         for (Utilisateur user : users) {
 
@@ -310,6 +318,7 @@ public class PointageService {
                 case ON_TIME -> onTime++;
                 case LATE    -> late++;
                 case ABSENT  -> absent++;
+                case NOT_YET -> notYet++;    // ✅ جديد
             }
         }
 
@@ -321,7 +330,8 @@ public class PointageService {
                 early,
                 onTime,
                 late,
-                absent
+                absent,
+                notYet          // ✅ جديد
         );
     }
 
@@ -335,7 +345,6 @@ public class PointageService {
             String statusFilter
     ) {
 
-        // ═══ ✅ فقط الموظفين المؤهلين لهذا التاريخ ═══
         List<Utilisateur> users = getEligibleEmployees(siteId, date);
 
         List<DailyAttendanceDTO> result = new ArrayList<>();
@@ -355,6 +364,7 @@ public class PointageService {
                     case "ON_TIME" -> status == AttendanceStatus.ON_TIME;
                     case "LATE"    -> status == AttendanceStatus.LATE;
                     case "ABSENT"  -> status == AttendanceStatus.ABSENT;
+                    case "NOT_YET" -> status == AttendanceStatus.NOT_YET;  // ✅ جديد
                     default        -> true;
                 };
 
@@ -407,7 +417,6 @@ public class PointageService {
         LocalDateTime start = startOfDay(date);
         LocalDateTime end   = endOfDay(date);
 
-        // ═══ ✅ فقط الموظفين المؤهلين لهذا التاريخ ═══
         List<Utilisateur> users = getEligibleEmployees(siteId, date);
 
         List<DailyReportRowDTO> rows = new ArrayList<>();
@@ -423,6 +432,19 @@ public class PointageService {
                             );
 
             if (pointages.isEmpty()) {
+
+                // ══════════════════════════════════════════════════
+                // ✅ اليوم + قبل 18:00 → "En attente"
+                //    غير ذلك → "Absent"
+                // ══════════════════════════════════════════════════
+                String statut;
+                if (date.equals(LocalDate.now())
+                        && LocalTime.now().isBefore(WORK_END)) {
+                    statut = "En attente";
+                } else {
+                    statut = "Absent";
+                }
+
                 rows.add(
                         new DailyReportRowDTO(
                                 user.getId(),
@@ -431,7 +453,7 @@ public class PointageService {
                                 null,
                                 null,
                                 0,
-                                "Absent"
+                                statut
                         )
                 );
                 continue;
@@ -492,7 +514,6 @@ public class PointageService {
         LocalDate startOfWeek = date.with(DayOfWeek.MONDAY);
         LocalDate endOfWeek   = startOfWeek.plusDays(6);
 
-        // ═══ جلب كل الموظفين النشطين (بدون فلتر التاريخ) ═══
         List<Utilisateur> users =
                 utilisateurRepository.findActiveEmployeesBySite(siteId);
 
@@ -509,9 +530,8 @@ public class PointageService {
                  !d.isAfter(endOfWeek);
                  d = d.plusDays(1)) {
 
-                // ═══ ✅ فحص الأهلية لكل يوم على حدة ═══
                 if (!isEligibleForDate(user, d)) {
-                    continue; // لا حضور ولا غياب لهذا اليوم
+                    continue;
                 }
 
                 var daily =
@@ -523,9 +543,11 @@ public class PointageService {
                                 .findFirst()
                                 .orElse(null);
 
-                if (daily == null
-                        || daily.getStatut().equals("Absent")) {
+                if (daily == null || daily.getStatut().equals("Absent")) {
                     absence++;
+                } else if (daily.getStatut().equals("En attente")) {
+                    // ✅ لا نحسبه حضور ولا غياب — لم يتأكد بعد
+                    continue;
                 } else {
                     presence++;
                     totalMinutes += daily.getTotalMinutes();
@@ -535,7 +557,6 @@ public class PointageService {
                 }
             }
 
-            // ═══ ✅ لا نضيف الموظف إذا لم يكن مؤهلاً في أي يوم ═══
             if (presence + absence == 0) continue;
 
             result.add(
@@ -567,7 +588,6 @@ public class PointageService {
         LocalDate start = LocalDate.of(year, month, 1);
         LocalDate end   = start.withDayOfMonth(start.lengthOfMonth());
 
-        // ═══ جلب كل الموظفين النشطين (بدون فلتر التاريخ) ═══
         List<Utilisateur> users =
                 utilisateurRepository.findActiveEmployeesBySite(siteId);
 
@@ -583,7 +603,6 @@ public class PointageService {
                  !d.isAfter(end);
                  d = d.plusDays(1)) {
 
-                // ═══ ✅ فحص الأهلية لكل يوم على حدة ═══
                 if (!isEligibleForDate(user, d)) {
                     continue;
                 }
@@ -597,16 +616,17 @@ public class PointageService {
                                 .findFirst()
                                 .orElse(null);
 
-                if (daily == null
-                        || daily.getStatut().equals("Absent")) {
+                if (daily == null || daily.getStatut().equals("Absent")) {
                     absence++;
+                } else if (daily.getStatut().equals("En attente")) {
+                    // ✅ لا نحسبه — لم يتأكد بعد
+                    continue;
                 } else {
                     totalDays++;
                     totalMinutes += daily.getTotalMinutes();
                 }
             }
 
-            // ═══ ✅ لا نضيف الموظف إذا لم يكن مؤهلاً في أي يوم ═══
             if (totalDays + absence == 0) continue;
 
             double taux =
@@ -640,7 +660,6 @@ public class PointageService {
         LocalDateTime start = startOfDay(date);
         LocalDateTime end   = endOfDay(date);
 
-        // ═══ ✅ فقط الموظفين المؤهلين لهذا التاريخ ═══
         List<Utilisateur> users = getEligibleEmployees(siteId, date);
 
         List<String> absentNames = new ArrayList<>();
@@ -658,9 +677,18 @@ public class PointageService {
                             );
 
             if (firstEntryOpt.isEmpty()) {
-                absentNames.add(
-                        user.getNom() + " " + user.getPrenom()
-                );
+                // ══════════════════════════════════════════════════
+                // ✅ فقط إذا كان غائب مؤكد (بعد 18:00 أو يوم فات)
+                // ══════════════════════════════════════════════════
+                boolean isConfirmedAbsent =
+                        !date.equals(LocalDate.now())
+                     || !LocalTime.now().isBefore(WORK_END);
+
+                if (isConfirmedAbsent) {
+                    absentNames.add(
+                            user.getNom() + " " + user.getPrenom()
+                    );
+                }
             }
         }
 

@@ -8,6 +8,7 @@ public class AttendanceStatsDTO {
     private long onTime;
     private long late;
     private long absent;
+    private long notYet;
 
     public AttendanceStatsDTO(
             long total,
@@ -15,7 +16,8 @@ public class AttendanceStatsDTO {
             long early,
             long onTime,
             long late,
-            long absent
+            long absent,
+            long notYet
     ) {
         this.total = total;
         this.present = present;
@@ -23,6 +25,7 @@ public class AttendanceStatsDTO {
         this.onTime = onTime;
         this.late = late;
         this.absent = absent;
+        this.notYet = notYet;
     }
 
     public long getTotal() { return total; }
@@ -31,4 +34,5 @@ public class AttendanceStatsDTO {
     public long getOnTime() { return onTime; }
     public long getLate() { return late; }
     public long getAbsent() { return absent; }
+    public long getNotYet() { return notYet; }
 }
