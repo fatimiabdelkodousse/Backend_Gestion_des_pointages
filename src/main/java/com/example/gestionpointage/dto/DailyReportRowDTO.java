@@ -12,6 +12,7 @@ public class DailyReportRowDTO {
     private LocalTime heureSortie;
 
     private long totalMinutes;
+    private String totalHeuresTravail;   
     private String statut;
 
     public DailyReportRowDTO(
@@ -29,15 +30,22 @@ public class DailyReportRowDTO {
         this.heureEntree = heureEntree;
         this.heureSortie = heureSortie;
         this.totalMinutes = totalMinutes;
+        this.totalHeuresTravail = formatMinutes(totalMinutes);  
         this.statut = statut;
     }
 
-    // Getters
+    private String formatMinutes(long minutes) {
+        long h = minutes / 60;
+        long m = minutes % 60;
+        return h + "h " + m + "min";
+    }
+
     public Long getUserId() { return userId; }
     public String getNom() { return nom; }
     public String getPrenom() { return prenom; }
     public LocalTime getHeureEntree() { return heureEntree; }
     public LocalTime getHeureSortie() { return heureSortie; }
     public long getTotalMinutes() { return totalMinutes; }
+    public String getTotalHeuresTravail() { return totalHeuresTravail; }  
     public String getStatut() { return statut; }
 }

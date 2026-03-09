@@ -9,6 +9,7 @@ public class WeeklyReportDTO {
     private long joursPresence;
     private long joursAbsence;
     private long totalMinutes;
+    private String totalHeuresTravail;   
     private long retards;
 
     public WeeklyReportDTO(
@@ -26,7 +27,14 @@ public class WeeklyReportDTO {
         this.joursPresence = joursPresence;
         this.joursAbsence = joursAbsence;
         this.totalMinutes = totalMinutes;
+        this.totalHeuresTravail = formatMinutes(totalMinutes); 
         this.retards = retards;
+    }
+
+    private String formatMinutes(long minutes) {
+        long h = minutes / 60;
+        long m = minutes % 60;
+        return h + "h " + m + "min";
     }
 
     public Long getUserId() { return userId; }
@@ -35,5 +43,6 @@ public class WeeklyReportDTO {
     public long getJoursPresence() { return joursPresence; }
     public long getJoursAbsence() { return joursAbsence; }
     public long getTotalMinutes() { return totalMinutes; }
+    public String getTotalHeuresTravail() { return totalHeuresTravail; }  
     public long getRetards() { return retards; }
 }

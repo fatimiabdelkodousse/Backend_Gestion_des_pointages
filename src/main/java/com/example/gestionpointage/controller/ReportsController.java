@@ -2,6 +2,7 @@ package com.example.gestionpointage.controller;
 
 import com.example.gestionpointage.dto.WeeklyReportDTO;
 import com.example.gestionpointage.dto.MonthlyReportDTO;
+import com.example.gestionpointage.dto.DailyReportRowDTO;
 import com.example.gestionpointage.service.PointageService;
 
 import org.springframework.web.bind.annotation.*;
@@ -11,14 +12,14 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.io.ByteArrayOutputStream;
 
-import org.apache.poi.ss.usermodel.Workbook;
-import org.apache.poi.ss.usermodel.Sheet;
-import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.ss.util.CellRangeAddress;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
-import com.example.gestionpointage.dto.DailyReportRowDTO;
 
 @RestController
 @RequestMapping("/reports")
@@ -27,15 +28,15 @@ public class ReportsController {
     private static final String XLSX_CONTENT_TYPE =
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
+    private static final DateTimeFormatter REPORT_DATE_FORMAT =
+            DateTimeFormatter.ofPattern("dd/MM/yyyy 'à' HH:mm");
+
     private final PointageService pointageService;
 
     public ReportsController(PointageService pointageService) {
         this.pointageService = pointageService;
     }
 
-    // ═══════════════════════════════════════════════════
-    //  JSON ENDPOINTS
-    // ═══════════════════════════════════════════════════
 
     @GetMapping("/daily")
     public List<DailyReportRowDTO> daily(
@@ -62,9 +63,6 @@ public class ReportsController {
                 siteId, year, month);
     }
 
-    // ═══════════════════════════════════════════════════
-    //  EXPORT DAILY
-    // ═══════════════════════════════════════════════════
 
     @GetMapping(
             value = "/export/daily",
@@ -78,34 +76,44 @@ public class ReportsController {
             var rows = pointageService.generateDailyReport(
                     siteId, LocalDate.parse(date));
 
-            try (Workbook workbook = new XSSFWorkbook()) {
-                Sheet sheet = workbook.createSheet("Daily Report");
+            if (rows.isEmpty()) {
+                return ResponseEntity.noContent().build();
+            }
 
-                Row header = sheet.createRow(0);
+            try (Workbook workbook = new XSSFWorkbook()) {
+                Sheet sheet = workbook.createSheet("Rapport Journalier");
+
+                addGeneratedDateRow(sheet, 6);
+
+                Row header = sheet.createRow(1);
                 header.createCell(0).setCellValue("Nom");
-                header.createCell(1).setCellValue("Prenom");
-                header.createCell(2).setCellValue("Entree");
+                header.createCell(1).setCellValue("Prénom");
+                header.createCell(2).setCellValue("Entrée");
                 header.createCell(3).setCellValue("Sortie");
-                header.createCell(4).setCellValue("Total Minutes");
+                header.createCell(4).setCellValue("Total Heures de Travail");  // ✅
                 header.createCell(5).setCellValue("Statut");
 
-                int rowIndex = 1;
+                // ✅ Style en-têtes en gras
+                applyHeaderStyle(workbook, header, 6);
+
+                // Row 2+: Données
+                int rowIndex = 2;
                 for (var r : rows) {
                     Row row = sheet.createRow(rowIndex++);
                     row.createCell(0).setCellValue(safeStr(r.getNom()));
                     row.createCell(1).setCellValue(safeStr(r.getPrenom()));
                     row.createCell(2).setCellValue(
                             r.getHeureEntree() != null
-                                    ? r.getHeureEntree().toString() : "");
+                                    ? r.getHeureEntree().toString() : "—");
                     row.createCell(3).setCellValue(
                             r.getHeureSortie() != null
-                                    ? r.getHeureSortie().toString() : "");
-                    row.createCell(4).setCellValue(r.getTotalMinutes());
+                                    ? r.getHeureSortie().toString() : "—");
+                    row.createCell(4).setCellValue(r.getTotalHeuresTravail());  // ✅
                     row.createCell(5).setCellValue(safeStr(r.getStatut()));
                 }
 
                 setColumnWidths(sheet, 6);
-                return buildExcelResponse(workbook, "daily_report.xlsx");
+                return buildExcelResponse(workbook, "rapport_journalier.xlsx");
             }
 
         } catch (Exception e) {
@@ -114,9 +122,6 @@ public class ReportsController {
         }
     }
 
-    // ═══════════════════════════════════════════════════
-    //  EXPORT WEEKLY
-    // ═══════════════════════════════════════════════════
 
     @GetMapping(
             value = "/export/weekly",
@@ -130,18 +135,26 @@ public class ReportsController {
             var rows = pointageService.generateWeeklyReport(
                     siteId, LocalDate.parse(date));
 
+            if (rows.isEmpty()) {
+                return ResponseEntity.noContent().build();
+            }
+
             try (Workbook workbook = new XSSFWorkbook()) {
-                Sheet sheet = workbook.createSheet("Weekly Report");
+                Sheet sheet = workbook.createSheet("Rapport Hebdomadaire");
 
-                Row header = sheet.createRow(0);
+                addGeneratedDateRow(sheet, 6);
+
+                Row header = sheet.createRow(1);
                 header.createCell(0).setCellValue("Nom");
-                header.createCell(1).setCellValue("Prenom");
-                header.createCell(2).setCellValue("Présences");
-                header.createCell(3).setCellValue("Absences");
+                header.createCell(1).setCellValue("Prénom");
+                header.createCell(2).setCellValue("Jours Présence");
+                header.createCell(3).setCellValue("Jours Absence");
                 header.createCell(4).setCellValue("Retards");
-                header.createCell(5).setCellValue("Total Minutes");
+                header.createCell(5).setCellValue("Total Heures de Travail");  // ✅
 
-                int rowIndex = 1;
+                applyHeaderStyle(workbook, header, 6);
+
+                int rowIndex = 2;
                 for (var r : rows) {
                     Row row = sheet.createRow(rowIndex++);
                     row.createCell(0).setCellValue(safeStr(r.getNom()));
@@ -149,11 +162,11 @@ public class ReportsController {
                     row.createCell(2).setCellValue(r.getJoursPresence());
                     row.createCell(3).setCellValue(r.getJoursAbsence());
                     row.createCell(4).setCellValue(r.getRetards());
-                    row.createCell(5).setCellValue(r.getTotalMinutes());
+                    row.createCell(5).setCellValue(r.getTotalHeuresTravail());  // ✅
                 }
 
                 setColumnWidths(sheet, 6);
-                return buildExcelResponse(workbook, "weekly_report.xlsx");
+                return buildExcelResponse(workbook, "rapport_hebdomadaire.xlsx");
             }
 
         } catch (Exception e) {
@@ -179,30 +192,42 @@ public class ReportsController {
             var rows = pointageService.generateMonthlyReport(
                     siteId, year, month);
 
+            // ✅ Pas de données → 204
+            if (rows.isEmpty()) {
+                return ResponseEntity.noContent().build();
+            }
+
             try (Workbook workbook = new XSSFWorkbook()) {
-                Sheet sheet = workbook.createSheet("Monthly Report");
+                Sheet sheet = workbook.createSheet("Rapport Mensuel");
 
-                Row header = sheet.createRow(0);
+                // ✅ Row 0: "Édité le ..."
+                addGeneratedDateRow(sheet, 6);
+
+                // ✅ Row 1: En-têtes
+                Row header = sheet.createRow(1);
                 header.createCell(0).setCellValue("Nom");
-                header.createCell(1).setCellValue("Prenom");
-                header.createCell(2).setCellValue("Total Jours");
-                header.createCell(3).setCellValue("Présences");
+                header.createCell(1).setCellValue("Prénom");
+                header.createCell(2).setCellValue("Jours Travaillés");
+                header.createCell(3).setCellValue("Taux Présence (%)");
                 header.createCell(4).setCellValue("Absences");
-                header.createCell(5).setCellValue("Total Minutes");
+                header.createCell(5).setCellValue("Total Heures de Travail");  // ✅
 
-                int rowIndex = 1;
+                applyHeaderStyle(workbook, header, 6);
+
+                int rowIndex = 2;
                 for (var r : rows) {
                     Row row = sheet.createRow(rowIndex++);
                     row.createCell(0).setCellValue(safeStr(r.getNom()));
                     row.createCell(1).setCellValue(safeStr(r.getPrenom()));
                     row.createCell(2).setCellValue(r.getTotalJoursTravail());
-                    row.createCell(3).setCellValue(r.getTauxPresence());
+                    row.createCell(3).setCellValue(
+                            Math.round(r.getTauxPresence() * 100.0) / 100.0 + "%");
                     row.createCell(4).setCellValue(r.getAbsences());
-                    row.createCell(5).setCellValue(r.getTotalMinutes());
+                    row.createCell(5).setCellValue(r.getTotalHeuresTravail());  // ✅
                 }
 
                 setColumnWidths(sheet, 6);
-                return buildExcelResponse(workbook, "monthly_report.xlsx");
+                return buildExcelResponse(workbook, "rapport_mensuel.xlsx");
             }
 
         } catch (Exception e) {
@@ -214,6 +239,45 @@ public class ReportsController {
     // ═══════════════════════════════════════════════════
     //  HELPERS
     // ═══════════════════════════════════════════════════
+
+    private void addGeneratedDateRow(Sheet sheet, int columnCount) {
+        Row row = sheet.createRow(0);
+        Cell cell = row.createCell(0);
+        cell.setCellValue(
+                "Édité le " + LocalDateTime.now().format(REPORT_DATE_FORMAT)
+        );
+
+        if (columnCount > 1) {
+            sheet.addMergedRegion(
+                    new CellRangeAddress(0, 0, 0, columnCount - 1)
+            );
+        }
+
+        CellStyle style = sheet.getWorkbook().createCellStyle();
+        Font font = sheet.getWorkbook().createFont();
+        font.setItalic(true);
+        font.setColor(IndexedColors.GREY_50_PERCENT.getIndex());
+        font.setFontHeightInPoints((short) 10);
+        style.setFont(font);
+        cell.setCellStyle(style);
+    }
+
+    private void applyHeaderStyle(Workbook workbook, Row headerRow, int columnCount) {
+        CellStyle style = workbook.createCellStyle();
+        Font font = workbook.createFont();
+        font.setBold(true);
+        font.setFontHeightInPoints((short) 11);
+        style.setFont(font);
+        style.setFillForegroundColor(IndexedColors.LIGHT_CORNFLOWER_BLUE.getIndex());
+        style.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+
+        for (int i = 0; i < columnCount; i++) {
+            Cell cell = headerRow.getCell(i);
+            if (cell != null) {
+                cell.setCellStyle(style);
+            }
+        }
+    }
 
     private ResponseEntity<byte[]> buildExcelResponse(
             Workbook workbook,
@@ -234,7 +298,7 @@ public class ReportsController {
 
     private void setColumnWidths(Sheet sheet, int columnCount) {
         for (int i = 0; i < columnCount; i++) {
-            sheet.setColumnWidth(i, 5000);
+            sheet.setColumnWidth(i, 6000);
         }
     }
 

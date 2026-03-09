@@ -413,7 +413,11 @@ public class PointageService {
             Long siteId,
             LocalDate date
     ) {
-
+    	
+    	if (date.isAfter(LocalDate.now())) {
+    	        return new ArrayList<>();
+    	}
+    	
         LocalDateTime start = startOfDay(date);
         LocalDateTime end   = endOfDay(date);
 
@@ -514,6 +518,9 @@ public class PointageService {
         LocalDate startOfWeek = date.with(DayOfWeek.MONDAY);
         LocalDate endOfWeek   = startOfWeek.plusDays(6);
 
+        LocalDate today = LocalDate.now();
+        LocalDate effectiveEnd = endOfWeek.isAfter(today) ? today : endOfWeek;
+
         List<Utilisateur> users =
                 utilisateurRepository.findActiveEmployeesBySite(siteId);
 
@@ -527,7 +534,7 @@ public class PointageService {
             long retards      = 0;
 
             for (LocalDate d = startOfWeek;
-                 !d.isAfter(endOfWeek);
+                 !d.isAfter(effectiveEnd);      
                  d = d.plusDays(1)) {
 
                 if (!isEligibleForDate(user, d)) {
@@ -546,7 +553,6 @@ public class PointageService {
                 if (daily == null || daily.getStatut().equals("Absent")) {
                     absence++;
                 } else if (daily.getStatut().equals("En attente")) {
-                    // ✅ لا نحسبه حضور ولا غياب — لم يتأكد بعد
                     continue;
                 } else {
                     presence++;
@@ -588,6 +594,11 @@ public class PointageService {
         LocalDate start = LocalDate.of(year, month, 1);
         LocalDate end   = start.withDayOfMonth(start.lengthOfMonth());
 
+        LocalDate today = LocalDate.now();
+        if (end.isAfter(today)) {
+            end = today;
+        }
+
         List<Utilisateur> users =
                 utilisateurRepository.findActiveEmployeesBySite(siteId);
 
@@ -619,7 +630,6 @@ public class PointageService {
                 if (daily == null || daily.getStatut().equals("Absent")) {
                     absence++;
                 } else if (daily.getStatut().equals("En attente")) {
-                    // ✅ لا نحسبه — لم يتأكد بعد
                     continue;
                 } else {
                     totalDays++;
