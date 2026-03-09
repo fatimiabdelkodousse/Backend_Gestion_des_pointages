@@ -18,7 +18,7 @@ import java.util.List;
 @RequestMapping("/sites")
 public class SiteController {
 
-    private static final LocalTime ELIGIBILITY_CUTOFF = LocalTime.of(6, 0);
+    private static final LocalTime ELIGIBILITY_CUTOFF = LocalTime.of(9, 0);
 
     private final SiteRepository siteRepository;
     private final UtilisateurRepository utilisateurRepository;
