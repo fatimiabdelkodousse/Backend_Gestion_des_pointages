@@ -1,7 +1,7 @@
 package com.example.gestionpointage.model;
 
 import com.example.gestionpointage.entity.Site;
-
+import java.time.LocalDate;
 import jakarta.persistence.*;
 
 @Entity
@@ -25,7 +25,7 @@ public class Utilisateur {
     @OneToOne(
         mappedBy = "utilisateur",
         cascade = CascadeType.ALL,
-        orphanRemoval = true   // ✅ هذا هو السطر الناقص
+        orphanRemoval = true   
     )
     private Badge badge;
     
@@ -38,6 +38,17 @@ public class Utilisateur {
     @ManyToOne
     @JoinColumn(name = "site_id")
     private Site site;
+    
+    @Column(name = "eligible_from")
+    private LocalDate eligibleFrom;
+
+    public LocalDate getEligibleFrom() {
+        return eligibleFrom;
+    }
+
+    public void setEligibleFrom(LocalDate eligibleFrom) {
+        this.eligibleFrom = eligibleFrom;
+    }
     
     public boolean isActive() {
         return active;

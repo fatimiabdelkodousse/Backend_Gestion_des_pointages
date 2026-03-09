@@ -2,6 +2,8 @@ package com.example.gestionpointage.controller;
 
 import com.example.gestionpointage.dto.CreateUserWithBadgeDTO;
 
+import java.time.LocalTime;
+import java.time.LocalDate;
 
 import org.springframework.http.ResponseEntity;
 
@@ -88,11 +90,13 @@ public class UtilisateurController {
         Utilisateur u = utilisateurRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Utilisateur introuvable"));
 
+        boolean wasBadgeActive = u.getBadge() != null && u.getBadge().isActive();
+
         u.setNom(dto.nom);
         u.setPrenom(dto.prenom);
         u.setEmail(dto.email);
         u.setRole(dto.role);
-        
+
         Site site = siteRepository.findById(dto.siteId)
                 .orElseThrow(() -> new RuntimeException("Site introuvable"));
 
@@ -113,6 +117,16 @@ public class UtilisateurController {
             b.setActive(dto.active != null ? dto.active : true);
             badgeRepository.save(b);
             u.setBadge(b);
+
+            boolean isBadgeNowActive = b.isActive();
+
+            if (!wasBadgeActive && isBadgeNowActive) {
+                LocalDate eligibleFrom =
+                        LocalTime.now().isBefore(LocalTime.of(9, 0))
+                                ? LocalDate.now()
+                                : LocalDate.now().plusDays(1);
+                u.setEligibleFrom(eligibleFrom);
+            }
         }
 
         return utilisateurRepository.save(u);

@@ -61,7 +61,23 @@ public class PointageService {
     }
 
     private LocalDateTime endOfDay(LocalDate date) {
-        return date.atTime(LocalTime.MAX);  
+        return date.atTime(LocalTime.MAX);
+    }
+
+    // =====================================================
+    // ✅ ELIGIBILITY HELPERS
+    // =====================================================
+
+    private boolean isEligibleForDate(Utilisateur user, LocalDate date) {
+        return user.getEligibleFrom() == null
+                || !date.isBefore(user.getEligibleFrom());
+    }
+
+    private List<Utilisateur> getEligibleEmployees(Long siteId, LocalDate date) {
+        return utilisateurRepository.findActiveEmployeesBySite(siteId)
+                .stream()
+                .filter(u -> isEligibleForDate(u, date))
+                .toList();
     }
 
     // =====================================================
@@ -75,7 +91,7 @@ public class PointageService {
     ) {
 
         LocalDateTime start = startOfDay(date);
-        LocalDateTime end   = endOfDay(date);     
+        LocalDateTime end   = endOfDay(date);
 
         LocalTime workStart      = LocalTime.of(9, 0);
         LocalTime toleranceLimit = LocalTime.of(9, 5);
@@ -110,7 +126,7 @@ public class PointageService {
     }
 
     // =====================================================
-    // ✅ CREATE POINTAGE (مُصحّح)
+    // ✅ CREATE POINTAGE
     // =====================================================
 
     public Pointage createPointageByBadge(
@@ -171,7 +187,7 @@ public class PointageService {
                     "Aucun site associé à cet utilisateur"
             );
         }
-        
+
         if (!site.isActive()) {
             throw new ResponseStatusException(
                     HttpStatus.FORBIDDEN,
@@ -180,7 +196,7 @@ public class PointageService {
         }
 
         // ══════════════════════════════════════════════════
-        // ✅ FIX 1: استنتاج النوع من آخر pointage في نفس اليوم فقط
+        // استنتاج النوع من آخر pointage في نفس اليوم فقط
         // ══════════════════════════════════════════════════
         LocalDate pointageDate = timestamp.toLocalDate();
         LocalDateTime dayStart = startOfDay(pointageDate);
@@ -197,7 +213,6 @@ public class PointageService {
         PointageType type;
 
         if (lastSameDayOpt.isEmpty()) {
-            // ═══ أول pointage في هذا اليوم → دائماً ENTREE ═══
             type = PointageType.ENTREE;
         } else {
             Pointage lastToday = lastSameDayOpt.get();
@@ -218,12 +233,9 @@ public class PointageService {
 
         Long siteId = site.getId();
 
-        // ══════════════════════════════════════════════════
-        // ✅ FIX 2: WebSocket يرسل إحصائيات بتاريخ الـ Pointage
-        // ══════════════════════════════════════════════════
         messagingTemplate.convertAndSend(
                 "/topic/stats/" + siteId,
-                getDailyStatsBySite(siteId, pointageDate)  // ✅ تاريخ الـ pointage
+                getDailyStatsBySite(siteId, pointageDate)
         );
 
         messagingTemplate.convertAndSend(
@@ -271,7 +283,7 @@ public class PointageService {
     }
 
     // =====================================================
-    // DAILY STATS BY SITE (DASHBOARD)
+    // ✅ DAILY STATS BY SITE (DASHBOARD)
     // =====================================================
 
     public AttendanceStatsDTO getDailyStatsBySite(
@@ -279,8 +291,8 @@ public class PointageService {
             LocalDate date
     ) {
 
-        List<Utilisateur> users =
-                utilisateurRepository.findActiveEmployeesBySite(siteId);
+        // ═══ ✅ فقط الموظفين المؤهلين لهذا التاريخ ═══
+        List<Utilisateur> users = getEligibleEmployees(siteId, date);
 
         long total  = users.size();
         long early  = 0;
@@ -314,7 +326,7 @@ public class PointageService {
     }
 
     // =====================================================
-    // ATTENDANCE LIST BY SITE
+    // ✅ ATTENDANCE LIST BY SITE
     // =====================================================
 
     public List<DailyAttendanceDTO> getDailyAttendanceBySite(
@@ -323,8 +335,8 @@ public class PointageService {
             String statusFilter
     ) {
 
-        List<Utilisateur> users =
-                utilisateurRepository.findActiveEmployeesBySite(siteId);
+        // ═══ ✅ فقط الموظفين المؤهلين لهذا التاريخ ═══
+        List<Utilisateur> users = getEligibleEmployees(siteId, date);
 
         List<DailyAttendanceDTO> result = new ArrayList<>();
 
@@ -333,7 +345,6 @@ public class PointageService {
             AttendanceStatus status =
                     resolveAttendanceStatus(user, siteId, date);
 
-            // ═══ فلتر الحالة ═══
             if (statusFilter != null && !statusFilter.isEmpty()) {
                 boolean match = switch (statusFilter.toUpperCase()) {
                     case "PRESENT" ->
@@ -372,7 +383,7 @@ public class PointageService {
 
         LocalDate today = LocalDate.now();
         LocalDateTime start = startOfDay(today);
-        LocalDateTime end   = endOfDay(today);    // ✅ FIX 3
+        LocalDateTime end   = endOfDay(today);
 
         List<Pointage> pointages = pointageRepository
                 .findBySiteIdAndTimestampBetweenOrderByTimestampDesc(
@@ -385,7 +396,7 @@ public class PointageService {
     }
 
     // =====================================================
-    // DAILY REPORT
+    // ✅ DAILY REPORT
     // =====================================================
 
     public List<DailyReportRowDTO> generateDailyReport(
@@ -394,10 +405,10 @@ public class PointageService {
     ) {
 
         LocalDateTime start = startOfDay(date);
-        LocalDateTime end   = endOfDay(date);     // ✅ FIX 3
+        LocalDateTime end   = endOfDay(date);
 
-        List<Utilisateur> users =
-                utilisateurRepository.findActiveEmployeesBySite(siteId);
+        // ═══ ✅ فقط الموظفين المؤهلين لهذا التاريخ ═══
+        List<Utilisateur> users = getEligibleEmployees(siteId, date);
 
         List<DailyReportRowDTO> rows = new ArrayList<>();
 
@@ -470,7 +481,7 @@ public class PointageService {
     }
 
     // =====================================================
-    // WEEKLY REPORT
+    // ✅ WEEKLY REPORT
     // =====================================================
 
     public List<WeeklyReportDTO> generateWeeklyReport(
@@ -481,6 +492,7 @@ public class PointageService {
         LocalDate startOfWeek = date.with(DayOfWeek.MONDAY);
         LocalDate endOfWeek   = startOfWeek.plusDays(6);
 
+        // ═══ جلب كل الموظفين النشطين (بدون فلتر التاريخ) ═══
         List<Utilisateur> users =
                 utilisateurRepository.findActiveEmployeesBySite(siteId);
 
@@ -496,6 +508,11 @@ public class PointageService {
             for (LocalDate d = startOfWeek;
                  !d.isAfter(endOfWeek);
                  d = d.plusDays(1)) {
+
+                // ═══ ✅ فحص الأهلية لكل يوم على حدة ═══
+                if (!isEligibleForDate(user, d)) {
+                    continue; // لا حضور ولا غياب لهذا اليوم
+                }
 
                 var daily =
                         generateDailyReport(siteId, d)
@@ -518,6 +535,9 @@ public class PointageService {
                 }
             }
 
+            // ═══ ✅ لا نضيف الموظف إذا لم يكن مؤهلاً في أي يوم ═══
+            if (presence + absence == 0) continue;
+
             result.add(
                     new WeeklyReportDTO(
                             user.getId(),
@@ -535,7 +555,7 @@ public class PointageService {
     }
 
     // =====================================================
-    // MONTHLY REPORT
+    // ✅ MONTHLY REPORT
     // =====================================================
 
     public List<MonthlyReportDTO> generateMonthlyReport(
@@ -547,6 +567,7 @@ public class PointageService {
         LocalDate start = LocalDate.of(year, month, 1);
         LocalDate end   = start.withDayOfMonth(start.lengthOfMonth());
 
+        // ═══ جلب كل الموظفين النشطين (بدون فلتر التاريخ) ═══
         List<Utilisateur> users =
                 utilisateurRepository.findActiveEmployeesBySite(siteId);
 
@@ -561,6 +582,11 @@ public class PointageService {
             for (LocalDate d = start;
                  !d.isAfter(end);
                  d = d.plusDays(1)) {
+
+                // ═══ ✅ فحص الأهلية لكل يوم على حدة ═══
+                if (!isEligibleForDate(user, d)) {
+                    continue;
+                }
 
                 var daily =
                         generateDailyReport(siteId, d)
@@ -580,11 +606,11 @@ public class PointageService {
                 }
             }
 
+            // ═══ ✅ لا نضيف الموظف إذا لم يكن مؤهلاً في أي يوم ═══
+            if (totalDays + absence == 0) continue;
+
             double taux =
-                    (totalDays + absence) == 0
-                            ? 0
-                            : ((double) totalDays
-                            / (totalDays + absence)) * 100;
+                    ((double) totalDays / (totalDays + absence)) * 100;
 
             result.add(
                     new MonthlyReportDTO(
@@ -603,7 +629,7 @@ public class PointageService {
     }
 
     // =====================================================
-    // ABSENT USERS
+    // ✅ ABSENT USERS
     // =====================================================
 
     public List<String> getAbsentUsersNames(
@@ -612,10 +638,10 @@ public class PointageService {
     ) {
 
         LocalDateTime start = startOfDay(date);
-        LocalDateTime end   = endOfDay(date);     // ✅ FIX 3
+        LocalDateTime end   = endOfDay(date);
 
-        List<Utilisateur> users =
-                utilisateurRepository.findActiveEmployeesBySite(siteId);
+        // ═══ ✅ فقط الموظفين المؤهلين لهذا التاريخ ═══
+        List<Utilisateur> users = getEligibleEmployees(siteId, date);
 
         List<String> absentNames = new ArrayList<>();
 
@@ -648,7 +674,7 @@ public class PointageService {
     public DailyReportDTO getDailyReport(Long userId, LocalDate date) {
 
         LocalDateTime start = startOfDay(date);
-        LocalDateTime end   = endOfDay(date);     // ✅ FIX 3
+        LocalDateTime end   = endOfDay(date);
 
         List<Pointage> pointages =
                 pointageRepository

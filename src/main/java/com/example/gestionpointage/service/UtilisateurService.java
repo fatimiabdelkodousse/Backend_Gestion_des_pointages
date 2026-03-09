@@ -9,19 +9,35 @@ import org.springframework.transaction.annotation.Transactional;
 import com.example.gestionpointage.repository.SiteRepository;
 import com.example.gestionpointage.entity.Site;
 
+import java.time.LocalDate;
+import java.time.LocalTime;
+
 @Service
 @Transactional
 public class UtilisateurService {
 
+    private static final LocalTime ELIGIBILITY_CUTOFF = LocalTime.of(6, 0);
+
     private final UtilisateurRepository utilisateurRepository;
     private final SiteRepository siteRepository;
-    
+
     public UtilisateurService(
             UtilisateurRepository utilisateurRepository,
             SiteRepository siteRepository
     ) {
         this.utilisateurRepository = utilisateurRepository;
         this.siteRepository = siteRepository;
+    }
+
+    /**
+     * حساب eligibleFrom حسب الوقت الحالي:
+     *   قبل 06:00 → اليوم
+     *   بعد 06:00 → الغد
+     */
+    private LocalDate computeEligibleFrom() {
+        return LocalTime.now().isBefore(ELIGIBILITY_CUTOFF)
+                ? LocalDate.now()
+                : LocalDate.now().plusDays(1);
     }
 
     public Utilisateur createUserWithBadge(CreateUserWithBadgeDTO dto) {
@@ -37,6 +53,7 @@ public class UtilisateurService {
                 throw new RuntimeException("Email already exists");
             }
 
+            // ═══ استعادة موظف محذوف ═══
             user = existingUser;
             user.setDeleted(false);
             user.setActive(true);
@@ -46,6 +63,7 @@ public class UtilisateurService {
 
         } else {
 
+            // ═══ إنشاء موظف جديد ═══
             user = new Utilisateur();
             user.setNom(dto.nom);
             user.setPrenom(dto.prenom);
@@ -54,7 +72,7 @@ public class UtilisateurService {
             user.setActive(true);
             user.setDeleted(false);
         }
-        
+
         Site site = siteRepository.findById(dto.siteId)
                 .orElseThrow(() -> new RuntimeException("Site introuvable"));
 
@@ -73,6 +91,10 @@ public class UtilisateurService {
             badge.setActive(dto.active != null ? dto.active : false);
 
             user.setBadge(badge);
+
+            if (badge.isActive()) {
+                user.setEligibleFrom(computeEligibleFrom());
+            }
         }
 
         Utilisateur savedUser = utilisateurRepository.save(user);
