@@ -11,6 +11,7 @@ import com.example.gestionpointage.repository.UtilisateurRepository;
 import com.example.gestionpointage.dto.DailyReportRowDTO;
 import com.example.gestionpointage.dto.WeeklyReportDTO;
 import com.example.gestionpointage.dto.MonthlyReportDTO;
+import com.example.gestionpointage.repository.VacanceRepository;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -45,17 +46,20 @@ public class PointageService {
     private final UtilisateurRepository utilisateurRepository;
     private final BadgeRepository badgeRepository;
     private final SimpMessagingTemplate messagingTemplate;
+    private final VacanceRepository vacanceRepository;
 
     public PointageService(
             PointageRepository pointageRepository,
             UtilisateurRepository utilisateurRepository,
             BadgeRepository badgeRepository,
-            SimpMessagingTemplate messagingTemplate
+            SimpMessagingTemplate messagingTemplate,
+            VacanceRepository vacanceRepository           
     ) {
         this.pointageRepository = pointageRepository;
         this.utilisateurRepository = utilisateurRepository;
         this.badgeRepository = badgeRepository;
         this.messagingTemplate = messagingTemplate;
+        this.vacanceRepository = vacanceRepository;         
     }
 
     private LocalDateTime startOfDay(LocalDate date) {
@@ -65,16 +69,15 @@ public class PointageService {
     private LocalDateTime endOfDay(LocalDate date) {
         return date.atTime(LocalTime.MAX);
     }
+    
+    private boolean isHoliday(LocalDate date) {
+        return vacanceRepository.existsByDate(date);
+    }
 
     // =====================================================
     // ✅ ELIGIBILITY HELPER
     // =====================================================
 
-    /**
-     * هل الموظف مؤهل للمحاسبة على الغياب في تاريخ معين؟
-     * ⚠️ هذا يُستخدم فقط عندما لا يوجد pointage
-     *     إذا كان عنده pointage، يُعرض دائماً
-     */
     private boolean isEligibleForDate(Utilisateur user, LocalDate date) {
         return user.getEligibleFrom() == null
                 || !date.isBefore(user.getEligibleFrom());
@@ -84,10 +87,6 @@ public class PointageService {
     // 🔥 CENTRALIZED ATTENDANCE LOGIC
     // =====================================================
 
-    /**
-     * ✅ يرجع null إذا الموظف غير مؤهل ولا عنده pointage
-     *    (يعني يجب تجاهله بالكامل)
-     */
     private AttendanceStatus resolveAttendanceStatus(
             Utilisateur user,
             Long siteId,
@@ -110,24 +109,33 @@ public class PointageService {
                         );
 
         if (firstEntryOpt.isEmpty()) {
+
             // ══════════════════════════════════════════════════════
-            // ✅ لا يوجد pointage → نتحقق من الأهلية
-            //    غير مؤهل → null (تجاهل)
-            //    مؤهل → نحدد الحالة
+            // ✅ لا يوجد pointage
             // ══════════════════════════════════════════════════════
-            if (!isEligibleForDate(user, date)) {
-                return null;  // ✅ تجاهل — لا يُحسب لا غائب ولا حاضر
+
+            // ✅ يوم عطلة → تجاهل (لا غائب ولا حاضر)
+            if (isHoliday(date)) {
+                return null;
             }
 
+            // ✅ غير مؤهل → تجاهل
+            if (!isEligibleForDate(user, date)) {
+                return null;
+            }
+
+            // ✅ اليوم + قبل 18:00 → NOT_YET
             if (date.equals(LocalDate.now())
                     && LocalTime.now().isBefore(WORK_END)) {
                 return AttendanceStatus.NOT_YET;
             }
+
             return AttendanceStatus.ABSENT;
         }
 
         // ══════════════════════════════════════════════════════
-        // ✅ يوجد pointage → يُعالج عادي بغض النظر عن eligibleFrom
+        // ✅ يوجد pointage → يُعالج عادي
+        //    (حتى في يوم العطلة، إذا عمل يُحسب له)
         // ══════════════════════════════════════════════════════
         LocalTime arrival =
                 firstEntryOpt.get()
@@ -465,10 +473,12 @@ public class PointageService {
 
             if (pointages.isEmpty()) {
 
-                // ══════════════════════════════════════════════════
-                // ✅ لا يوجد pointage → نتحقق من الأهلية
-                //    غير مؤهل → تجاهل (لا يظهر في التقرير)
-                // ══════════════════════════════════════════════════
+                // ✅ يوم عطلة → لا نضيف صف للموظف
+                if (isHoliday(date)) {
+                    continue;
+                }
+
+                // ✅ غير مؤهل → تجاهل
                 if (!isEligibleForDate(user, date)) {
                     continue;
                 }
@@ -736,7 +746,12 @@ public class PointageService {
 
             if (firstEntryOpt.isEmpty()) {
 
-                // ✅ لا pointage → نتحقق من الأهلية
+                // ✅ يوم عطلة → لا نحسبه غائب
+                if (isHoliday(date)) {
+                    continue;
+                }
+
+                // ✅ غير مؤهل → لا نحسبه غائب
                 if (!isEligibleForDate(user, date)) {
                     continue;
                 }
