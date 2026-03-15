@@ -76,12 +76,6 @@ public class ReportsController {
             var rows = pointageService.generateDailyReport(
                     siteId, LocalDate.parse(date));
             
-            System.out.println("=== DEBUG ===");
-            System.out.println("siteId: " + siteId);
-            System.out.println("date: " + date);
-            System.out.println("rows size: " + rows.size());
-            System.out.println("=============");
-            
             if (rows.isEmpty()) {
                 return ResponseEntity.noContent().build();
             }
