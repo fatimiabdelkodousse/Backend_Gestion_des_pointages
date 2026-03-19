@@ -3,13 +3,15 @@ package com.example.gestionpointage.service;
 import com.example.gestionpointage.entity.Vacance;
 import com.example.gestionpointage.repository.VacanceRepository;
 
-import jakarta.annotation.PostConstruct;
+// استيراد واجهة CommandLineRunner
+import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 
 @Service
-public class VacanceInitService {
+// إضافة implements CommandLineRunner
+public class VacanceInitService implements CommandLineRunner { 
 
     private final VacanceRepository vacanceRepository;
 
@@ -17,7 +19,13 @@ public class VacanceInitService {
         this.vacanceRepository = vacanceRepository;
     }
 
-    @PostConstruct
+    // تم حذف @PostConstruct
+    // هذه الدالة (run) ستعمل تلقائياً بعد أن يكتمل تشغيل التطبيق وتصبح قاعدة البيانات جاهزة
+    @Override
+    public void run(String... args) throws Exception {
+        initMoroccanHolidays();
+    }
+
     public void initMoroccanHolidays() {
 
         if (vacanceRepository.count() > 0) return;
